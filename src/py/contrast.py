@@ -13,7 +13,17 @@ class ContourCropper:
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.ffmpeg_exe = ffmpeg_exe
-        self.crop_script = "src/contrast.sh"
+
+        # Get user's operating system
+        self.user_operating_system = sys.platform
+
+        ### Bash/Zsh scripts for Linux and Mac ###
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            self.contrast_script = os.path.join("src", "sh", "contrast.sh")
+
+        ### Powershell scripts for Windows ###
+        elif self.user_operating_system == "win32":
+            self.contrast_script = os.path.join("src", "ps1", "contrast.ps1")
 
         self.files = sorted(os.listdir(input_dir))
         if not self.files:
@@ -170,16 +180,15 @@ class ContourCropper:
 
         eqVals = self.ffmpeg_eq_filter()
 
-        command = [
-            "sh",
-            self.crop_script,
-            self.ffmpeg_exe,
-            self.path,
-            name,
-            self.output_dir,
-            str(eqVals[0]),
-            str(eqVals[1])
-        ]
+        parameters = [self.ffmpeg_exe, self.path, name, self.output_dir, str(eqVals[0]), str(eqVals[1])]
+
+        # Command for linux and mac
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            command = ["sh", self.contrast_script, *parameters]
+
+        # Command for windows
+        elif self.user_operating_system in ["win32"]:
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", self.contrast_script, *parameters]
 
         subprocess.run(command, check=False)
 

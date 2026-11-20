@@ -1,6 +1,4 @@
-import sys
-import os
-import subprocess
+import subprocess, sys, os
 
 import cv2
 import matplotlib.pyplot as plt
@@ -14,7 +12,17 @@ class ContourCropper:
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.ffmpeg_exe = ffmpeg_exe
-        self.crop_script = os.path.join("src", "crop.sh")
+
+        # Get user's operating system
+        self.user_operating_system = sys.platform
+
+        ### Bash/Zsh scripts for Linux and Mac ###
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            self.crop_script = os.path.join("src", "sh", "crop.sh")
+
+        ### Powershell scripts for Windows ###
+        elif self.user_operating_system == "win32":
+            self.crop_script = os.path.join("src", "ps1", "crop.ps1")
 
         # Files in Input directory
         self.files = sorted(os.listdir(input_dir))
@@ -333,13 +341,13 @@ class ContourCropper:
                 cv2.rectangle(display_frame, (x0, y0), (x1, y1), self.SELECTED_COLOR,2)
 
                 cv2.putText(display_frame, f"C {contour_index}", (int(x0+(width/2)), int(y0+(height/2))),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, self.SELECTED_COLOR, self.LINE_WIDTH)
+                            self.INSTRUCTION_FONT, 1, self.SELECTED_COLOR, self.LINE_WIDTH)
 
         # Draw the manual boxes
         for manual_id, (x0, y0, x1, y1) in self.manual_boxes.items():
             cv2.rectangle(display_frame, (x0, y0), (x1, y1), self.SELECTED_COLOR, 2)
             cv2.putText(display_frame, f"{self.manual_label} {-manual_id}", (x0 + (x1-x0)//2, y0 + (y1-y0)//2),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, self.SELECTED_COLOR, self.LINE_WIDTH)
+                self.INSTRUCTION_FONT, 1, self.SELECTED_COLOR, self.LINE_WIDTH)
 
         # Instructtion to add to the canva
         instructions = [
@@ -444,15 +452,15 @@ class ContourCropper:
         filenames = "/".join(filenames.values())
         coordinates = "/".join(coordinates.values())
 
-        command = [
-            "sh",
-            self.crop_script,
-            self.ffmpeg_exe,
-            self.path,
-            coordinates,
-            self.output_dir,
-            filenames,
-        ]
+        parameters = [self.ffmpeg_exe, self.path, coordinates, self.output_dir, filenames]
+
+        # Command for linux and mac
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            command = ["sh", self.crop_script, *parameters]
+
+        # Command for windows
+        elif self.user_operating_system in ["win32"]:
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", self.crop_script, *parameters]
 
         subprocess.run(command, check=False)
 

@@ -10,7 +10,17 @@ class addMaks:
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.ffmpeg_exe = ffmpeg_exe
-        self.mask_script = "src/mask.sh"
+
+        # Get user's operating system
+        self.user_operating_system = sys.platform
+
+        ### Bash/Zsh scripts for Linux and Mac ###
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            self.mask_script = os.path.join("src", "sh", "mask.sh")
+
+        ### Powershell scripts for Windows ###
+        elif self.user_operating_system == "win32":
+            self.mask_script = os.path.join("src", "ps1", "mask.ps1")
 
         self.files = sorted(os.listdir(input_dir))
         if not self.files:
@@ -51,26 +61,26 @@ class addMaks:
         capture.release()
 
         if not success or frame is None:
-            raise RuntimeError(f"Could not read an image/frame from {self.path!r}")
+            raise RuntimeError(f"Could not read an frame from {self.path!r}")
 
         self.frame = frame
         self.redraw()
 
     def mask_current_frame(self):
 
-        filename = os.path.splitext(self.files[self.index])[0]
+        filename = os.path.splitext(self.files[self.index])[0] 
 
-        command = [
-            "sh",
-            self.mask_script,
-            self.ffmpeg_exe,
-            self.path,
-            str(self.x), str(self.y), str(self.width), str(self.height),
-            self.output_dir,
-            filename,
-        ]
+        parameters = [self.ffmpeg_exe, self.path, str(self.x), str(self.y), str(self.width), str(self.height), self.output_dir, filename,]
 
-        subprocess.run(command, check=False)
+        # Command for linux and mac
+        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+            command = ["sh", self.mask_script, *parameters]
+
+        # Command for windows
+        elif self.user_operating_system in ["win32"]:
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", self.mask_script, *parameters]
+
+        subprocess.run(command, check=False, capture_output=True, text=True)
 
     def on_key_press(self, event):
         if event.key == "escape":
@@ -135,6 +145,7 @@ class addMaks:
         plt.show()
 
 if __name__ == "__main__":
+
     app = addMaks(sys.argv[1], sys.argv[2], sys.argv[3])
     app.run()
     

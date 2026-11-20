@@ -17,8 +17,6 @@ It allows for easier video pre-processing and faster dataset preparation for mac
 
 - [Install FFMPEG](https://ffmpeg.org/download.html) (adding it to PATH is not necessary)
 
-- If you are on Windows, [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
-
 - Go this repository directory ```cd PREP```
 
 - Install the requirements in a new python *env*
@@ -35,7 +33,7 @@ pip install -r requirements.txt
 
 - Python 3.10+
 - FFMPEG
-- Linux. Windows with WSL as it uses bash. No idea on Mac
+- Linux (bash). Windows (powershell). No idea on Mac
 
 # Features
 
@@ -113,7 +111,7 @@ Qwen 3.5 9B using llama.cpp was used to improve syntax.
 
 ## Citation
 
-Feel free to cite this repository!
+Feel free to cite this repository! :D
 
 ## Authors
 

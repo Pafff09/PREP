@@ -1,4 +1,4 @@
-import subprocess, threading, queue, json
+import subprocess, threading, queue, json, sys, os
 from pathlib import Path
 
 from tkinter import filedialog, messagebox
@@ -6,15 +6,26 @@ import ttkbootstrap as ttk
 import tkinter as tk
 
 ### General paths ###$
-PAHT_STORAGE = "storage/paths.json"
-TEST_SETTINGS_SCRIPT = "src/test_settings.sh"
+PAHT_STORAGE = os.path.join("storage", "paths.json")
 
-### Paths to work scripts ###
-CAP_FPS_SCRIPT = "src/cap_fps.sh"
-CONTRAST_SCRIPT = "src/contrast.py"
-CROP_SCRIPT = "src/crop.py"
-MASK_SCRIPT = "src/mask.py"
-LETTER_BOX_SCRIPT = "src/letter_box.sh"
+### Python Scripts ###
+CONTRAST_SCRIPT = os.path.join("src", "py", "contrast.py")
+CROP_SCRIPT = os.path.join("src", "py", "crop.py")
+MASK_SCRIPT = os.path.join("src", "py", "mask.py")
+
+# Get user's operating system
+user_operating_system = sys.platform
+
+### Bash/Zsh scripts for Linux and Mac ###
+if user_operating_system in ["linux", "linux2", "darwin"]:
+    CAP_FPS_SCRIPT = os.path.join("src", "sh", "cap_fps.sh")
+    LETTER_BOX_SCRIPT = os.path.join("src", "sh", "letter_box.sh")
+    TEST_SETTINGS_SCRIPT = os.path.join("src", "sh", "test_settings.sh")
+### Powershell scripts for Windows ###
+elif user_operating_system == "win32":
+    CAP_FPS_SCRIPT = os.path.join("src", "ps1", "cap_fps.ps1")
+    LETTER_BOX_SCRIPT = os.path.join("src", "ps1", "letter_box.ps1")
+    TEST_SETTINGS_SCRIPT = os.path.join("src", "ps1", "test_settings.ps1")
 
 
 class App(ttk.Window):
@@ -412,13 +423,22 @@ class App(ttk.Window):
         if not exe:
             return
 
-        # Test if ffmpeg path provided is functional
-        command = ["sh", TEST_SETTINGS_SCRIPT, *[exe]]
+        ### Test if ffmpeg path provided is functional ###
+        # Linux and Mac #
+        if user_operating_system in ["linux", "linux2", "darwin"]:
+            command = ["sh", TEST_SETTINGS_SCRIPT, *[exe]]
+        # Windows #
+        elif user_operating_system in ["win32"]:
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", TEST_SETTINGS_SCRIPT, *[exe]]
+
+        # Run the command
         response = subprocess.run(
                         command,
                         capture_output=True,
                         text=True,
                         check=False)
+
+        # If errors,
         if response.returncode != 0:
             messagebox.showerror(
                 "Invalid .exe",
@@ -592,6 +612,8 @@ class App(ttk.Window):
         # Run both bash and python scripts
         if ".sh" in script_path:
             command = ["sh", script_path, *arguments]
+        elif ".ps1" in script_path:
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path, *arguments]
         elif ".py" in script_path:
             command = ["python", script_path, *arguments]
 
