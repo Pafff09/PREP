@@ -1,8 +1,8 @@
-# Preprocess Recordings of Ethological Protocols (PREP)
+<p align="center">
+  <img src="./assets/logo.png" width="640" alt="FERAL" />
+</p>
 
-<div style="text-align: center;">
-  <img src="./assets/logo.png" width="200" style="display: block; margin: 0 auto;">
-</div>
+<h1 align="center">Preprocess Recordings of Ethological Protocols (PREP).</h1>
 
 GUI-based pipeline using FFMPEG allowing for the pre-process of standardised behavioural protocol recordings. 
 It allows for easier video pre-processing and faster dataset preparation for machine learning algorithms. 
