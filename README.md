@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Preprocess Recordings of Ethological Protocols (PREP)
 
 <div style="text-align: center;">
