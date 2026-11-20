@@ -1,11 +1,10 @@
-<<<<<<< HEAD
 # Preprocess Recordings of Ethological Protocols (PREP)
 
 <div style="text-align: center;">
   <img src="./assets/logo.png" width="200" style="display: block; margin: 0 auto;">
 </div>
 
-GUI-based pipeline allowing for the pre-process of standardised behavioural protocol recordings. 
+GUI-based pipeline using FFMPEG allowing for the pre-process of standardised behavioural protocol recordings. 
 It allows for easier video pre-processing and faster dataset preparation for machine learning algorithms. 
 
 <div style="text-align: center;">
