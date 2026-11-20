@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/logo.png" width="640" alt="FERAL" />
+  <img src="./assets/logo.png" width="200" alt="FERAL" />
 </p>
 
 <h1 align="center">Preprocess Recordings of Ethological Protocols (PREP).</h1>
