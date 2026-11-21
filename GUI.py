@@ -7,6 +7,8 @@ import ttkbootstrap as ttk
 import tkinter as tk
 import cv2
 
+from src.py.mask import AddMask
+
 ### General paths ###
 PAHT_STORAGE = os.path.join("storage", "paths.json")
 
@@ -75,6 +77,8 @@ class App(ttk.Window):
         self._build_layout()
         self.show_page("Home")
 
+    ''' BUILD PAGES '''
+
     def _build_layout(self):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -115,15 +119,9 @@ class App(ttk.Window):
         self._build_cap_fps_page()
         self._build_folder_script_page("Contrast", CONTRAST_SCRIPT)
         self._build_folder_script_page("Crop", CROP_SCRIPT)
-        self._build_folder_script_page("Mask", MASK_SCRIPT)
+        self._build_mask_page()
         self._build_letter_box_page()
-    '''
-    Build the HOME page
-        Title        : Default options for the program
-        FFMPEG exe   : Add path to ffmpeg.exe 
-        Set-up       : Ensure pip is installed and instal requirements.txt
-        User configs : Get user's config: OS, env
-    '''
+    
     def _build_home_page(self):
 
         # Create/Config the Frame for the page
@@ -181,50 +179,6 @@ class App(ttk.Window):
         
         self.pages["Home"] = page
 
-    '''
-    For all pages in the software,
-        Add a tree viewer 
-        Add vertical scrollbar to visualise larger directories 
-    '''
-    def _new_file_list(self, parent):
-
-        # Create a frame
-        frame = ttk.Frame(parent)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        # Tree viewer to visualise selected files
-        tree = ttk.Treeview(
-            frame,
-            columns=("filename",),
-            show="headings",
-            height=10,
-        )
-        tree.heading("filename", text="Add a directory containing the files of interest")
-        tree.column("filename", anchor="w")
-        tree.grid(row=0, column=0, sticky="nsew")
-
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(
-            frame,
-            orient="vertical",
-            command=tree.yview,
-        )
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        tree.configure(yscrollcommand=scrollbar.set)
-
-        return frame, tree
-
-    '''
-    Build FPS cap page
-        Title            : Cap FPS
-        Input directory  : Add an input directory containing the video files
-        Tree viewer      : Display the input files
-        Output directory : Path to directory to save the transformed files
-        Desired FPS      : Set a desired FPS for all videos
-        Script status    : FFMPEG running status
-        Run button       : Button to run script
-    '''
     def _build_cap_fps_page(self):
 
         # Add page main frame
@@ -432,12 +386,109 @@ class App(ttk.Window):
             "script": script_path,
         }
 
+    def _build_mask_page(self):
+        page = ttk.Frame(self.page_area, padding=24)
+        page.grid(row=0, column=0, sticky="nsew")
+        page.grid_columnconfigure(0, weight=1)
+        page.grid_columnconfigure(1, weight=2)
+        page.grid_columnconfigure(2, weight=0)
+        page.grid_rowconfigure(2, weight=1)
+        self.pages["Mask"] = page
+
+        self.mask_input_dir = tk.StringVar()
+        self.mask_output_dir = tk.StringVar()
+
+        ttk.Label(
+            page,
+            text="Mask",
+            font=("TkDefaultFont", 22, "bold"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
+
+        # Input
+        ttk.Label(page, text="Input folder:").grid(
+            row=1, column=0, sticky="w", padx=(0, 10), pady=6
+        )
+        ttk.Entry(page, textvariable=self.mask_input_dir).grid(
+            row=1, column=1, sticky="ew", pady=6
+        )
+        ttk.Button(
+            page,
+            text="Browse…",
+            bootstyle="secondary",
+            command=self.choose_mask_folder,
+        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+
+        files_frame, self.mask_file_list = self._new_file_list(page)
+        files_frame.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=(0, 12),
+            pady=(12, 16),
+        )
+
+        self.mask_plot_frame = ttk.Frame(page)
+        self.mask_plot_frame.grid(
+            row=2,
+            column=1,
+            columnspan=2,
+            sticky="nsew",
+            pady=(12, 16),
+        )
+
+        # Output
+        ttk.Label(page, text="Output directory:").grid(
+            row=3, column=0, sticky="w", padx=(0, 10), pady=6
+        )
+        ttk.Entry(page, textvariable=self.mask_output_dir).grid(
+            row=3, column=1, sticky="ew", pady=6
+        )
+        ttk.Button(
+            page,
+            text="Browse…",
+            bootstyle="secondary",
+            command=self.choose_mask_output_folder,
+        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+
+        self.mask_tool = AddMask(self.mask_plot_frame)
+
     def show_page(self, page_name):
         self.pages[page_name].tkraise()
 
         for name, button in self.nav_buttons.items():
             style = "primary" if name == page_name else "secondary outline"
             button.configure(bootstyle=style)
+
+    ''' TREEVIEWER METHODS '''
+
+    def _new_file_list(self, parent):
+
+            # Create a frame
+            frame = ttk.Frame(parent)
+            frame.grid_columnconfigure(0, weight=1)
+            frame.grid_rowconfigure(0, weight=1)
+
+            # Tree viewer to visualise selected files
+            tree = ttk.Treeview(
+                frame,
+                columns=("filename",),
+                show="headings",
+                height=10,
+            )
+            tree.heading("filename", text="Add a directory containing the files of interest")
+            tree.column("filename", anchor="w")
+            tree.grid(row=0, column=0, sticky="nsew")
+
+            # Add scrollbar
+            scrollbar = ttk.Scrollbar(
+                frame,
+                orient="vertical",
+                command=tree.yview,
+            )
+            scrollbar.grid(row=0, column=1, sticky="ns")
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            return frame, tree
 
     def _populate_file_list(self, tree, folder, which=None):
         
@@ -505,6 +556,8 @@ class App(ttk.Window):
 
         return len(files)
 
+    ''' SETUP METHODS '''
+
     def chose_ffmpeg_path(self):
         # Ask for the name of the ffmpeg file
         exe = filedialog.askopenfilename(title="Select ffmpeg.exe")
@@ -548,11 +601,7 @@ class App(ttk.Window):
             self.storage["path_ffmpeg"] = exe
             json.dump(self.storage, file, indent=2)
 
-    '''
-    Chose the input folder for FPS cap
-        Ask and add directory; if canceled do nothing 
-        Populate tree viewer
-    '''
+    ''' INPUT DIRECTORY  '''
     def choose_cap_folder(self):
 
         # Open filedialog - ask for a directory
@@ -582,6 +631,19 @@ class App(ttk.Window):
         page["input_dir"].set(folder)
         self._populate_file_list(page["file_list"], folder)
 
+    def choose_mask_folder(self):
+
+        # Ask for input folder
+        folder = filedialog.askdirectory(title="Select Mask input folder")
+        if not folder:
+            return
+
+        self.mask_input_dir.set(folder)
+        self._populate_file_list(self.mask_file_list, folder)
+        self._load_mask_folder()
+
+    ''' OUTPUT DIRECTORY '''
+
     def choose_output_directory(self, variable):
         folder = filedialog.askdirectory(
             title="Choose output directory",
@@ -589,12 +651,25 @@ class App(ttk.Window):
         )
         if folder:
             variable.set(folder)
+   
+    def choose_mask_output_folder(self):
+        folder = filedialog.askdirectory(
+            title="Choose output directory",
+            mustexist=False,
+        )
+        if not folder:
+            return
+
+        self.mask_output_dir.set(folder)
+        self._load_mask_folder()
 
     def ensure_output_directory(self, directory):
         """Create the output directory if it doesn't exist."""
         path = Path(directory).expanduser()
         path.mkdir(parents=True, exist_ok=True)
         return str(path.resolve())
+
+    ''' RUN SCRIPTS '''
 
     def run_letter_box(self):
         page = self.file_pages["Letter Box"]
@@ -706,6 +781,21 @@ class App(ttk.Window):
             return
 
         self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
+
+    def _load_mask_folder(self):
+        input_dir = self.mask_input_dir.get().strip()
+        output_dir = self.mask_output_dir.get().strip()
+
+        if not input_dir or not Path(input_dir).is_dir() or not output_dir:
+            return
+
+        self.mask_tool.load_folder(
+            input_dir,
+            output_dir,
+            self.storage["path_ffmpeg"],
+        )
+
+    ''' General run scripts '''
 
     def start_script(self, script_path, arguments, status_label):
         if self.script_running:
