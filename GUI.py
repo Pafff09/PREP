@@ -1,9 +1,11 @@
+# Libraries
 import subprocess, threading, queue, json, sys, os
 from pathlib import Path
 
 from tkinter import filedialog, messagebox
 import ttkbootstrap as ttk
 import tkinter as tk
+import cv2
 
 ### General paths ###
 PAHT_STORAGE = os.path.join("storage", "paths.json")
@@ -115,8 +117,15 @@ class App(ttk.Window):
         self._build_folder_script_page("Crop", CROP_SCRIPT)
         self._build_folder_script_page("Mask", MASK_SCRIPT)
         self._build_letter_box_page()
-
+    '''
+    Build the HOME page
+        Title        : Default options for the program
+        FFMPEG exe   : Add path to ffmpeg.exe 
+        Set-up       : Ensure pip is installed and instal requirements.txt
+        User configs : Get user's config: OS, env
+    '''
     def _build_home_page(self):
+
         # Create/Config the Frame for the page
         page = ttk.Frame(self.page_area, padding=24)
         page.grid(row=0, column=0, sticky="nsew")
@@ -144,12 +153,22 @@ class App(ttk.Window):
             self.ffmpeg_exe_label.config(icon="check", bootstyle="success")
 
         ### set up ###
-        ttk.Label(page, text="Install dependencies (Reccomended if you do not know how to do it!) - Button runs > src/py/setup.py"
+        def ensure_requirements():
+            response = subprocess.run(["python", SETUP_SCRIPT], capture_output=True, check=False)
+
+            if response.returncode != 0:
+                messagebox.showerror("ERROR" ,"Failed to install requirements", parent=self)
+                return
+            else:
+                messagebox.showinfo("SUCCESS", "Requirements have been installed", parent=self)
+                return 
+
+        ttk.Label(page, text="Install dependencies (Reccomended if you do not know how to do it!)"
                   ).grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
         ttk.Button(page,
                     text="Install setup",
                     bootstyle="secondary",
-                    command=lambda: subprocess.run(["python", SETUP_SCRIPT], check=False),
+                    command=ensure_requirements,
                     ).grid(row=2, column=2, padx=(8, 0), pady=6)
 
         ### user configs (os, env) ###
@@ -162,22 +181,30 @@ class App(ttk.Window):
         
         self.pages["Home"] = page
 
+    '''
+    For all pages in the software,
+        Add a tree viewer 
+        Add vertical scrollbar to visualise larger directories 
+    '''
     def _new_file_list(self, parent):
-        """Create a file list with a vertical scrollbar."""
+
+        # Create a frame
         frame = ttk.Frame(parent)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
 
+        # Tree viewer to visualise selected files
         tree = ttk.Treeview(
             frame,
             columns=("filename",),
             show="headings",
             height=10,
         )
-        tree.heading("filename", text="Files in input folder")
+        tree.heading("filename", text="Add a directory containing the files of interest")
         tree.column("filename", anchor="w")
         tree.grid(row=0, column=0, sticky="nsew")
 
+        # Add scrollbar
         scrollbar = ttk.Scrollbar(
             frame,
             orient="vertical",
@@ -188,66 +215,64 @@ class App(ttk.Window):
 
         return frame, tree
 
+    '''
+    Build FPS cap page
+        Title            : Cap FPS
+        Input directory  : Add an input directory containing the video files
+        Tree viewer      : Display the input files
+        Output directory : Path to directory to save the transformed files
+        Desired FPS      : Set a desired FPS for all videos
+        Script status    : FFMPEG running status
+        Run button       : Button to run script
+    '''
     def _build_cap_fps_page(self):
+
+        # Add page main frame
         page = ttk.Frame(self.page_area, padding=24)
         page.grid(row=0, column=0, sticky="nsew")
         page.grid_columnconfigure(1, weight=1)
         page.grid_rowconfigure(2, weight=1)
         self.pages["Cap FPS"] = page
 
-        ttk.Label(
-            page,
-            text="Cap FPS",
-            font=("TkDefaultFont", 22, "bold"),
-        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
+        # Title of the page
+        ttk.Label(page, text="Cap FPS", font=("TkDefaultFont", 22, "bold")
+                  ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
 
-        ttk.Label(page, text="Input folder:").grid(
-            row=1, column=0, sticky="w", padx=(0, 10), pady=6
-        )
-        ttk.Entry(page, textvariable=self.cap_input_dir).grid(
-            row=1, column=1, sticky="ew", pady=6
-        )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_cap_folder,
-        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+        # Input directory
+        ttk.Label(page, text="Input folder:"
+                  ).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(page, textvariable=self.cap_input_dir
+                  ).grid(row=1, column=1, sticky="ew", pady=6)
+        ttk.Button(page, text="Browse…", bootstyle="secondary", command=self.choose_cap_folder
+                   ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
+        # Tree viewer
         files_frame, self.cap_file_list = self._new_file_list(page)
-        files_frame.grid(
-            row=2,
-            column=0,
-            columnspan=3,
-            sticky="nsew",
-            pady=(12, 16),
-        )
+        files_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(12, 16))
 
-        ttk.Label(page, text="Output directory:").grid(
-            row=3, column=0, sticky="w", padx=(0, 10), pady=6
-        )
-        ttk.Entry(page, textvariable=self.cap_output_dir).grid(
-            row=3, column=1, sticky="ew", pady=6
-        )
+        # Output directory
+        ttk.Label(page, text="Output directory:"
+                  ).grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(page, textvariable=self.cap_output_dir
+                  ).grid(row=3, column=1, sticky="ew", pady=6)
         ttk.Button(
             page,
             text="Browse…",
             bootstyle="secondary",
-            command=lambda: self.choose_output_directory(
-                self.cap_output_dir
-            ),
-        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+            command=lambda: self.choose_output_directory(self.cap_output_dir)
+            ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
-        ttk.Label(page, text="Desired frame count:").grid(
-            row=4, column=0, sticky="w", padx=(0, 10), pady=6
-        )
-        ttk.Entry(page, textvariable=self.target_frames, width=12).grid(
-            row=4, column=1, sticky="w", pady=6
-        )
+        # Desired FPS 
+        ttk.Label(page, text="Desired frame count:"
+                  ).grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(page, textvariable=self.target_frames, width=12
+                  ).grid(row=4, column=1, sticky="w", pady=6)
 
+        # Script status
         self.cap_status = ttk.Label(page, text="Ready")
         self.cap_status.grid(row=5, column=1, sticky="w", padx=10)
 
+        # Run button
         run_button = ttk.Button(
             page,
             text="Run Cap FPS",
@@ -414,12 +439,13 @@ class App(ttk.Window):
             style = "primary" if name == page_name else "secondary outline"
             button.configure(bootstyle=style)
 
-    def _populate_file_list(self, tree, folder):
+    def _populate_file_list(self, tree, folder, which=None):
+        
         # Intercalate colors in the rows
         tree.tag_configure("odd", background="#666666")
         tree.tag_configure("even", background="#333333")
 
-        # Format the size of the file
+        # Format the label of the size of the file
         def format_size(size_bytes):
             size = float(size_bytes)
             for unit in ("B", "KB", "MB", "GB", "TB"):
@@ -427,18 +453,27 @@ class App(ttk.Window):
                     return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
                 size /= 1024
 
+        # Delete previous tree
         tree.delete(*tree.get_children())
 
-        # Set up these columns once; calling this here is also safe when repopulating.
-        columns = ("name", "extension", "size")
-        tree.configure(columns=columns, show="headings")
-
+        # Estalish baseline columns, headings and col widths
+        columns = ["name", "extension", "size"]
         headings = {
             "name": "File name",
             "extension": "Extension",
             "size": "Size",
         }
-        widths = {"name": 280, "extension": 90, "size": 100, "duration": 120}
+        widths = {"name": 280, "extension": 90, "size": 90}
+
+        ### Specific columns for each page ###
+        # If called in FPS cap
+        if which == "fps":
+            columns.append("fps")
+            headings["fps"] = "FPS"
+            widths["fps"] = 90
+
+        # Configs the treeviewer
+        tree.configure(columns=columns, show="headings")
 
         for column in columns:
             tree.heading(column, text=headings[column], anchor="w")
@@ -456,8 +491,17 @@ class App(ttk.Window):
         for index, path in enumerate(files):
             extension = path.suffix.lower() or "—"
             size = format_size(path.stat().st_size)
+            vals = [path.name, extension, size]
 
-            tree.insert("", "end", values=(path.name, extension, size), tags=("even" if index % 2 == 0 else "odd"))
+            ### Get specific page values ###
+            if which == "fps":
+                cap = cv2.VideoCapture(str(path))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                vals.append(round(fps, 2) if cap.isOpened() and fps > 0 else None)
+                cap.release()
+
+            # Add to tree
+            tree.insert("", "end", values=vals, tags=("even" if index % 2 == 0 else "odd"))
 
         return len(files)
 
@@ -504,14 +548,26 @@ class App(ttk.Window):
             self.storage["path_ffmpeg"] = exe
             json.dump(self.storage, file, indent=2)
 
+    '''
+    Chose the input folder for FPS cap
+        Ask and add directory; if canceled do nothing 
+        Populate tree viewer
+    '''
     def choose_cap_folder(self):
+
+        # Open filedialog - ask for a directory
         folder = filedialog.askdirectory(title="Select Cap FPS input folder")
+
+        # If nothing is selected, do nothing
         if not folder:
             return
 
+        # Set the input file to the folder provided
         self.cap_input_dir.set(folder)
-        count = self._populate_file_list(self.cap_file_list, folder)
 
+        # Populate tree viewer with the given files
+        # And get the returned number of file to show number of files
+        count = self._populate_file_list(self.cap_file_list, folder, which="fps")
         if count is not None:
             self.cap_status.configure(text=f"{count} file(s) found")
 

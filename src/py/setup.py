@@ -28,6 +28,7 @@ def main():
     except subprocess.CalledProcessError as error:
         print(f"Command failed with exit code {error.returncode}.", file=sys.stderr)
         return error.returncode or 1
+
     return 0
 
 if __name__ == "__main__":
