@@ -1,85 +1,112 @@
-import sys
-import os
 import ntpath
+import os
 import subprocess
+import sys
+from pathlib import Path
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.widgets import Slider
+import ttkbootstrap as ttk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
 
 class ContourCropper:
-    def __init__(self, input_dir, output_dir, ffmpeg_exe):
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self.ffmpeg_exe = ffmpeg_exe
-
-        # Get user's operating system
-        self.user_operating_system = sys.platform
-
-        ### Bash/Zsh scripts for Linux and Mac ###
-        if self.user_operating_system in ["linux", "linux2", "darwin"]:
-            self.contrast_script = os.path.join("src", "sh", "contrast.sh")
-
-        ### Powershell scripts for Windows ###
-        elif self.user_operating_system == "win32":
-            self.contrast_script = os.path.join("src", "ps1", "contrast.ps1")
-
-        self.files = sorted(os.listdir(input_dir))
-        if not self.files:
-            raise ValueError(f"No files found in {input_dir!r}")
-
-        self.BRIGHTNESS = 0
-        self.CONTRAST = 0
-
-        self.INSTRUCTION_WIDTH = 1
-        self.INSTRUCTION_COLOR = (0, 0, 255)
-        self.INSTRUCTION_SIZE = 0.8
-        self.INSTRUCTION_GAP = 40
-        self.INSTRUCTION_FONT = cv2.FONT_HERSHEY_SIMPLEX
-
+    def __init__(self, parent):
+        
+        self.parent = parent
+        self.input_dir = ""
+        self.output_dir = ""
+        self.ffmpeg_exe = ""
+        self.files = []
         self.index = 0
         self.frame = None
         self.path = None
         self.frame_inx = 0
+        self.image_artist = None
 
-        # To set the inital slides with the real values of the first video
+        self.user_operating_system = sys.platform
+        if self.user_operating_system in ("linux", "linux2", "darwin"):
+            self.contrast_script = os.path.join("src", "sh", "contrast.sh")
+        elif self.user_operating_system == "win32":
+            self.contrast_script = os.path.join("src", "ps1", "contrast.ps1")
+        else:
+            raise OSError(
+                f"Unsupported operating system: {self.user_operating_system}"
+            )
+
+        self.brightness_var = ttk.DoubleVar(value=0)
+        self.contrast_var = ttk.DoubleVar(value=0)
+
+        controls = ttk.Frame(parent, padding=(8, 0))
+        controls.pack(side="right", fill="y")
+
+        ttk.Label(controls, text="Brightness").pack(pady=(8, 0))
+        self.brightness_scale = ttk.Scale(
+            controls,
+            from_=0,
+            to=255,
+            orient="vertical",
+            variable=self.brightness_var,
+            command=self.update_sliders,
+            length=220,
+        )
+        self.brightness_scale.pack(fill="y", expand=True, padx=12)
+
+        ttk.Label(controls, text="Contrast").pack(pady=(8, 0))
+        self.contrast_scale = ttk.Scale(
+            controls,
+            from_=0,
+            to=255,
+            orient="vertical",
+            variable=self.contrast_var,
+            command=self.update_sliders,
+            length=220,
+        )
+        self.contrast_scale.pack(fill="y", expand=True, padx=12)
+
+        self.fig = Figure(figsize=(8, 5))
+        self.ax = self.fig.add_subplot(111)
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
+        self.canvas.get_tk_widget().pack(side="left", fill="both", expand=True)
+        self.canvas.mpl_connect("key_press_event", self.on_key_press)
+
+        self.BRIGHTNESS = 0.0
+        self.CONTRAST = 0.0
+
+    def load_folder(self, input_dir, output_dir, ffmpeg_exe):
+        self.input_dir = input_dir
+        self.output_dir = output_dir
+        self.ffmpeg_exe = ffmpeg_exe
+        self.files = sorted(
+            (path.name for path in Path(input_dir).iterdir() if path.is_file()),
+            key=str.casefold,
+        )
+        self.index = 0
+        self.frame_inx = 0
+
+        if not self.files:
+            self.show_message("No files found")
+            return
+
         self.show_frame(0, redraw=False)
 
-        self.fig, self.ax = plt.subplots(figsize=(12, 6))
-        self.fig.subplots_adjust(left=0.28, right=0.72, top=0.95, bottom=0.05)
-
-        self.fig.canvas.mpl_connect("key_press_event", self.on_key_press)
-
-        # Sliders
-        bright_ax = self.fig.add_axes([0.17, 0.25, 0.0225, 0.5])
-        contra_ax = self.fig.add_axes([0.14, 0.25, 0.0225, 0.5])
-
-        self.bright_slider = Slider(
-            ax=bright_ax,
-            label="BRIGHTNESS",
-            valmin=0,
-            valmax=255,
-            valinit=self.BRIGHTNESS,
-            orientation="vertical",
+    def show_message(self, text):
+        self.frame = None
+        self.ax.clear()
+        self.ax.text(
+            0.5,
+            0.5,
+            text,
+            ha="center",
+            va="center",
+            transform=self.ax.transAxes,
         )
-        self.contra_slider = Slider(
-            ax=contra_ax,
-            label="CONTRAST",
-            valmin=0,
-            valmax=255,
-            valinit=self.CONTRAST,
-            orientation="vertical",
-        )
-
-        self.bright_slider.label.set_rotation(90)
-        self.contra_slider.label.set_rotation(90)
-
-        self.bright_slider.on_changed(self.update_sliders)
-        self.contra_slider.on_changed(self.update_sliders)
+        self.ax.set_axis_off()
+        self.canvas.draw_idle()
 
     def show_frame(self, index, redraw=True):
-
         self.index = index
         self.path = os.path.join(self.input_dir, self.files[index])
 
@@ -89,144 +116,124 @@ class ContourCropper:
         capture.release()
 
         if not success or frame is None:
-            raise RuntimeError(f"Could not read an image/frame from {self.path!r}")
+            self.show_message(f"Could not read a frame from:\n{self.path}")
+            return
 
-        if redraw == True:
-            self.frame = frame
-            self.redraw()
-        else:
-            initial_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            self.BRIGHTNESS = float(np.mean(initial_gray))
-            self.CONTRAST = float(np.std(initial_gray))
+        self.frame = frame
+
+        if not redraw:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            self.BRIGHTNESS = float(np.mean(gray))
+            self.CONTRAST = float(np.std(gray))
+
+            # Set the controls to this frame's initial brightness and contrast.
+            self.brightness_var.set(self.BRIGHTNESS)
+            self.contrast_var.set(self.CONTRAST)
+
+        self.redraw()
 
     def ffmpeg_eq_filter(self):
         gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
         current_mean = float(np.mean(gray))
         current_std = float(np.std(gray))
 
-        # The contrast multiplier needed to reach the slider's target contrast.
         ff_contrast = self.CONTRAST / current_std if current_std > 0 else 1.0
-
-        # Convert the target mean to FFmpeg's brightness offset.
         ff_brightness = (
             self.BRIGHTNESS
             - ff_contrast * current_mean
             - 127.5 * (1.0 - ff_contrast)
         ) / 255.0
 
-        # Keep values within FFmpeg eq's documented ranges.
         ff_brightness = float(np.clip(ff_brightness, -1.0, 1.0))
         ff_contrast = float(np.clip(ff_contrast, -1000.0, 1000.0))
 
-        return (ff_brightness, ff_contrast)
+        return ff_brightness, ff_contrast
 
     def redraw(self):
-        # Measure the unmodified frame.
+        if self.frame is None:
+            return
+
         gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
         current_mean = float(np.mean(gray))
         current_std = float(np.std(gray))
 
-        if current_std > 0:
-            alpha = self.CONTRAST / current_std
-        else:
-            alpha = 1.0
-
+        alpha = self.CONTRAST / current_std if current_std > 0 else 1.0
         beta = self.BRIGHTNESS - alpha * current_mean
+
         display_frame = np.clip(
             self.frame.astype(np.float32) * alpha + beta,
             0,
             255,
         ).astype(np.uint8)
 
-        instructions = [
-            "LEFT-ARROW for the next frame",
-            "RIGHT-ARROW for the previous frame",
-            "Press ENTER to crop and continue",
-            "Press ESCAPE to quit",
-        ]
-
-        for pos, text in enumerate(instructions):
-            cv2.putText(
-                display_frame,
-                text,
-                (10, 40 + pos * self.INSTRUCTION_GAP),
-                self.INSTRUCTION_FONT,
-                self.INSTRUCTION_SIZE,
-                self.INSTRUCTION_COLOR,
-                self.INSTRUCTION_WIDTH,
-            )
+        display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
 
         self.ax.clear()
-        self.ax.imshow(cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB))
-        self.ax.set_title(self.path)
+        self.ax.imshow(display_frame)
+        self.ax.set_title(
+            f"{self.path}\nFrame {self.frame_inx}"
+        )
         self.ax.set_axis_off()
-        self.fig.canvas.draw_idle()
+        self.canvas.draw_idle()
 
-    def update_sliders(self, _):
-
-        self.BRIGHTNESS = self.bright_slider.val
-        self.CONTRAST = self.contra_slider.val
-
-        if self.frame is not None:
-            self.redraw()
+    def update_sliders(self, _value=None):
+        self.BRIGHTNESS = float(self.brightness_var.get())
+        self.CONTRAST = float(self.contrast_var.get())
+        self.redraw()
 
     def run_script(self):
-
-        # Get file name
         name = ntpath.basename(self.path)
-        if "." in name:
-            for i in range(name.count(".")):
-                name = name[:-name[::-1].index(".")-1]
+        name = os.path.splitext(name)[0]
 
-        eqVals = self.ffmpeg_eq_filter()
+        eq_values = self.ffmpeg_eq_filter()
+        parameters = [
+            self.ffmpeg_exe,
+            self.path,
+            name,
+            self.output_dir,
+            str(eq_values[0]),
+            str(eq_values[1]),
+        ]
 
-        parameters = [self.ffmpeg_exe, self.path, name, self.output_dir, str(eqVals[0]), str(eqVals[1])]
-
-        # Command for linux and mac
-        if self.user_operating_system in ["linux", "linux2", "darwin"]:
+        if self.user_operating_system in ("linux", "linux2", "darwin"):
             command = ["sh", self.contrast_script, *parameters]
-
-        # Command for windows
-        elif self.user_operating_system in ["win32"]:
-            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", self.contrast_script, *parameters]
+        else:
+            command = [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                self.contrast_script,
+                *parameters,
+            ]
 
         subprocess.run(command, check=False)
 
     def on_key_press(self, event):
-
-        # ESCAPE - brute force close the plt
         if event.key == "escape":
-            plt.close(self.fig)
+            self.show_message("Contrast preview closed")
             return
 
-        ### Allow the user to move inbetween frames of the same video ###
-        # RIGHT ARROW - next frame
         if event.key == "right":
             self.frame_inx += 1
             self.show_frame(self.index)
-        # LEFT ARROW - previous frame
+            return
+
         if event.key == "left":
             if self.frame_inx > 0:
                 self.frame_inx -= 1
                 self.show_frame(self.index)
+            return
 
-        # OTHER - do nothing
         if event.key != "enter":
             return
 
         self.run_script()
 
         if self.index >= len(self.files) - 1:
-            plt.close(self.fig)
+            self.show_message("No more files")
             return
 
         self.frame_inx = 0
         self.show_frame(self.index + 1)
-
-    def run(self):
-        self.show_frame(self.index)
-        plt.show()
-
-if __name__ == "__main__":
-    app = ContourCropper(sys.argv[1], sys.argv[2], sys.argv[3])
-    app.run()

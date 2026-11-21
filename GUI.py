@@ -7,6 +7,7 @@ import ttkbootstrap as ttk
 import tkinter as tk
 import cv2
 
+from src.py.contrast import ContourCropper
 from src.py.mask import AddMask
 
 ### General paths ###
@@ -117,7 +118,7 @@ class App(ttk.Window):
 
         self._build_home_page()
         self._build_cap_fps_page()
-        self._build_folder_script_page("Contrast", CONTRAST_SCRIPT)
+        self._build_contrast_page()
         self._build_folder_script_page("Crop", CROP_SCRIPT)
         self._build_mask_page()
         self._build_letter_box_page()
@@ -313,6 +314,70 @@ class App(ttk.Window):
             "output_dir": self.letter_output_dir,
             "file_list": file_list
         }
+
+    def _build_contrast_page(self):
+
+        page = ttk.Frame(self.page_area, padding=24)
+        page.grid(row=0, column=0, sticky="nsew")
+        page.grid_columnconfigure(0, weight=1)
+        page.grid_columnconfigure(1, weight=2)
+        page.grid_columnconfigure(2, weight=0)
+        page.grid_rowconfigure(2, weight=1)
+        self.pages["Contrast"] = page
+
+        self.contrast_input_dir = tk.StringVar()
+        self.contrast_output_dir = tk.StringVar()
+
+        ttk.Label(
+            page,
+            text="Contrast",
+            font=("TkDefaultFont", 22, "bold"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
+
+        ttk.Label(page, text="Input folder:").grid(
+            row=1, column=0, sticky="w", padx=(0, 10), pady=6
+        )
+        ttk.Entry(page, textvariable=self.contrast_input_dir).grid(
+            row=1, column=1, sticky="ew", pady=6
+        )
+        ttk.Button(
+            page,
+            text="Browse…",
+            bootstyle="secondary",
+            command=self.choose_contrast_folder,
+        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+
+        files_frame, self.contrast_file_list = self._new_file_list(page)
+        files_frame.grid(
+            row=2,
+            column=0,
+            sticky="nsew",
+            padx=(0, 12),
+            pady=(12, 16),
+        )
+
+        self.contrast_plot_frame = ttk.Frame(page)
+        self.contrast_plot_frame.grid(
+            row=2,
+            column=1,
+            columnspan=2,
+            sticky="nsew",
+            pady=(12, 16),
+        )
+        self.contrast_tool = ContourCropper(self.contrast_plot_frame)
+
+        ttk.Label(page, text="Output directory:").grid(
+            row=3, column=0, sticky="w", padx=(0, 10), pady=6
+        )
+        ttk.Entry(page, textvariable=self.contrast_output_dir).grid(
+            row=3, column=1, sticky="ew", pady=6
+        )
+        ttk.Button(
+            page,
+            text="Browse…",
+            bootstyle="secondary",
+            command=self.choose_contrast_output_folder,
+        ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
     def _build_folder_script_page(self, name, script_path):
         
@@ -631,6 +696,15 @@ class App(ttk.Window):
         page["input_dir"].set(folder)
         self._populate_file_list(page["file_list"], folder)
 
+    def choose_contrast_folder(self):
+        folder = filedialog.askdirectory(title="Select Contrast input folder")
+        if not folder:
+            return
+
+        self.contrast_input_dir.set(folder)
+        self._populate_file_list(self.contrast_file_list, folder)
+        self._load_contrast_folder_if_ready()
+
     def choose_mask_folder(self):
 
         # Ask for input folder
@@ -662,6 +736,19 @@ class App(ttk.Window):
 
         self.mask_output_dir.set(folder)
         self._load_mask_folder()
+
+    
+    def choose_contrast_output_folder(self):
+
+        folder = filedialog.askdirectory(
+            title="Choose output directory",
+            mustexist=False,
+        )
+        if not folder:
+            return
+
+        self.contrast_output_dir.set(folder)
+        self._load_contrast_folder_if_ready()
 
     def ensure_output_directory(self, directory):
         """Create the output directory if it doesn't exist."""
@@ -781,6 +868,19 @@ class App(ttk.Window):
             return
 
         self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
+
+    def _load_contrast_folder_if_ready(self):
+        input_dir = self.contrast_input_dir.get().strip()
+        output_dir = self.contrast_output_dir.get().strip()
+
+        if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
+            return
+
+        self.contrast_tool.load_folder(
+            input_dir,
+            output_dir,
+            self.storage["path_ffmpeg"],
+        )
 
     def _load_mask_folder(self):
         input_dir = self.mask_input_dir.get().strip()
