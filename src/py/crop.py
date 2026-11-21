@@ -178,13 +178,19 @@ class ContourCropper:
         else:
             self.redraw()
 
-    def find_contours(self, frame):
+    def find_contours(self):
+        edges = cv2.Canny(
+            self.blurred_frame,
+            self.CANNY_THRESHOLD_1,
+            self.CANNY_THRESHOLD_2,
+            L2gradient=True,
+        )
 
-        edges = cv2.Canny(self.blurred_frame, threshold1=self.CANNY_THRESHOLD_1, threshold2=self.CANNY_THRESHOLD_2, L2gradient=True)
-
-        thresholded = cv2.threshold(edges, self.BINARY_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
-
-        contours, _ = cv2.findContours(thresholded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            edges,
+            cv2.RETR_LIST,  # includes contours inside other contours
+            cv2.CHAIN_APPROX_SIMPLE,
+        )
 
         return contours
 
@@ -257,7 +263,7 @@ class ContourCropper:
         self.frame = frame
         self.gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         self.blurred_frame = cv2.medianBlur(self.gray_frame, 5)
-        self.contours = self.find_contours(frame)
+        self.contours = self.find_contours()
 
         self.selected.clear()
         self.selected_coordinates.clear()
@@ -431,7 +437,7 @@ class ContourCropper:
         self.CANNY_THRESHOLD_2 = int(self.c2_slider.val)
 
         # Recompute contours from the already-loaded frame; don't reopen the video
-        self.contours = self.find_contours(self.frame)
+        self.contours = self.find_contours()
 
         # Remove the texbox from the contour only
         for item_id in list(self.contour_textboxes):
@@ -482,7 +488,7 @@ class ContourCropper:
                 self.show_frame(self.index)
 
         # B: Toggle Manual mode
-        if event.key == "b":
+        if event.key.lower() == "b":
             self.drawing_manual_box = not self.drawing_manual_box
             self.manual_drag_start = None
 

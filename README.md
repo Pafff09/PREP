@@ -13,25 +13,20 @@ It allows for easier video pre-processing and faster dataset preparation for mac
 
 # Installation & Set-up
 
-- Clone this repository
-
 - [Install FFMPEG](https://ffmpeg.org/download.html) (adding it to PATH is not necessary)
 
-- Go this repository directory ```cd PREP```
-
-- Install the requirements in a new python *env*
-
-```
-pip install -r requirements.txt
-```
+- Clone this repository
 
 - Run ```GUI.py```
 
 - In home page (default) set FFMPEG.exe path (in FFMPEG directory ```bin\ffmpeg.exe```)
 
+- In home page (default) install dependencies (or do it manually with ```pip install -r requirements.txt``` )
+
 ### System Requirements
 
 - Python 3.10+
+- Pip
 - FFMPEG
 - Linux (bash). Windows (powershell). No idea on Mac
 

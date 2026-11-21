@@ -5,13 +5,14 @@ from tkinter import filedialog, messagebox
 import ttkbootstrap as ttk
 import tkinter as tk
 
-### General paths ###$
+### General paths ###
 PAHT_STORAGE = os.path.join("storage", "paths.json")
 
 ### Python Scripts ###
 CONTRAST_SCRIPT = os.path.join("src", "py", "contrast.py")
 CROP_SCRIPT = os.path.join("src", "py", "crop.py")
 MASK_SCRIPT = os.path.join("src", "py", "mask.py")
+SETUP_SCRIPT = os.path.join("src", "py", "setup.py")
 
 # Get user's operating system
 user_operating_system = sys.platform
@@ -26,7 +27,6 @@ elif user_operating_system == "win32":
     CAP_FPS_SCRIPT = os.path.join("src", "ps1", "cap_fps.ps1")
     LETTER_BOX_SCRIPT = os.path.join("src", "ps1", "letter_box.ps1")
     TEST_SETTINGS_SCRIPT = os.path.join("src", "ps1", "test_settings.ps1")
-
 
 class App(ttk.Window):
     def __init__(self):
@@ -121,7 +121,6 @@ class App(ttk.Window):
         page = ttk.Frame(self.page_area, padding=24)
         page.grid(row=0, column=0, sticky="nsew")
         page.grid_columnconfigure(1, weight=1)
-        page.grid_rowconfigure(2, weight=1)
         self.pages["Home"] = page
 
         ttk.Label(page,
@@ -131,9 +130,8 @@ class App(ttk.Window):
                   ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
 
         ### ffmpeg path ###
-        self.ffmpeg_exe_label = ttk.Label(page,
-                  text="FFMPEG path:"
-                  ).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        self.ffmpeg_exe_label = ttk.Label(page, text="FFMPEG path:")
+        self.ffmpeg_exe_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Entry(page,
                   textvariable=self.ffmpeg_exe_path
                   ).grid(row=1, column=1, sticky="ew", pady=6)
@@ -144,6 +142,23 @@ class App(ttk.Window):
                     ).grid(row=1, column=2, padx=(8, 0), pady=6)
         if self.ffmpeg_exe_path.get().strip() != "":
             self.ffmpeg_exe_label.config(icon="check", bootstyle="success")
+
+        ### set up ###
+        ttk.Label(page, text="Install dependencies (Reccomended if you do not know how to do it!) - Button runs > src/py/setup.py"
+                  ).grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
+        ttk.Button(page,
+                    text="Install setup",
+                    bootstyle="secondary",
+                    command=lambda: subprocess.run(["python", SETUP_SCRIPT], check=False),
+                    ).grid(row=2, column=2, padx=(8, 0), pady=6)
+
+        ### user configs (os, env) ###
+        ttk.Label(page, text="User's configs", font=("TkDefaultFont", 14, "bold"),
+                  ).grid(row=3, column=0, sticky="w", pady=(30, 0))
+        ttk.Label(page, text=f"Detected user's OS            || {user_operating_system}"
+                  ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        ttk.Label(page, text=f"Detected user's virtualenv || {sys.prefix}"
+                ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 10))
         
         self.pages["Home"] = page
 
