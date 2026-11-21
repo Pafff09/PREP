@@ -415,18 +415,49 @@ class App(ttk.Window):
             button.configure(bootstyle=style)
 
     def _populate_file_list(self, tree, folder):
+        # Intercalate colors in the rows
+        tree.tag_configure("odd", background="#666666")
+        tree.tag_configure("even", background="#333333")
+
+        # Format the size of the file
+        def format_size(size_bytes):
+            size = float(size_bytes)
+            for unit in ("B", "KB", "MB", "GB", "TB"):
+                if size < 1024 or unit == "TB":
+                    return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+                size /= 1024
+
         tree.delete(*tree.get_children())
+
+        # Set up these columns once; calling this here is also safe when repopulating.
+        columns = ("name", "extension", "size")
+        tree.configure(columns=columns, show="headings")
+
+        headings = {
+            "name": "File name",
+            "extension": "Extension",
+            "size": "Size",
+        }
+        widths = {"name": 280, "extension": 90, "size": 100, "duration": 120}
+
+        for column in columns:
+            tree.heading(column, text=headings[column], anchor="w")
+            tree.column(column, width=widths[column], anchor="w")
 
         try:
             files = sorted(
-                path.name for path in Path(folder).iterdir() if path.is_file()
+                (path for path in Path(folder).iterdir() if path.is_file()),
+                key=lambda path: path.name.casefold(),
             )
         except OSError as error:
             messagebox.showerror("Folder error", str(error), parent=self)
-            return
+            return 0
 
-        for filename in files:
-            tree.insert("", "end", values=(filename,))
+        for index, path in enumerate(files):
+            extension = path.suffix.lower() or "—"
+            size = format_size(path.stat().st_size)
+
+            tree.insert("", "end", values=(path.name, extension, size), tags=("even" if index % 2 == 0 else "odd"))
 
         return len(files)
 
