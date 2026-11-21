@@ -11,7 +11,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 
-class ContourCropper:
+class Contrast:
     def __init__(self, parent):
         
         self.parent = parent

@@ -7,7 +7,8 @@ import ttkbootstrap as ttk
 import tkinter as tk
 import cv2
 
-from src.py.contrast import ContourCropper
+from src.py.crop import ContourCropper
+from src.py.contrast import Contrast
 from src.py.mask import AddMask
 
 ### General paths ###
@@ -119,7 +120,7 @@ class App(ttk.Window):
         self._build_home_page()
         self._build_cap_fps_page()
         self._build_contrast_page()
-        self._build_folder_script_page("Crop", CROP_SCRIPT)
+        self._build_crop_page()
         self._build_mask_page()
         self._build_letter_box_page()
     
@@ -364,7 +365,7 @@ class App(ttk.Window):
             sticky="nsew",
             pady=(12, 16),
         )
-        self.contrast_tool = ContourCropper(self.contrast_plot_frame)
+        self.contrast_tool = Contrast(self.contrast_plot_frame)
 
         ttk.Label(page, text="Output directory:").grid(
             row=3, column=0, sticky="w", padx=(0, 10), pady=6
@@ -379,77 +380,69 @@ class App(ttk.Window):
             command=self.choose_contrast_output_folder,
         ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
-    def _build_folder_script_page(self, name, script_path):
-        
+    def _build_crop_page(self):
+
         page = ttk.Frame(self.page_area, padding=24)
         page.grid(row=0, column=0, sticky="nsew")
-        page.grid_columnconfigure(1, weight=1)
+        page.grid_columnconfigure(0, weight=1)
+        page.grid_columnconfigure(1, weight=2)
+        page.grid_columnconfigure(2, weight=0)
         page.grid_rowconfigure(2, weight=1)
-        self.pages[name] = page
+        self.pages["Crop"] = page
 
-        input_dir = tk.StringVar()
-        output_dir = tk.StringVar()
+        self.crop_input_dir = tk.StringVar()
+        self.crop_output_dir = tk.StringVar()
 
         ttk.Label(
             page,
-            text=name,
+            text="Crop",
             font=("TkDefaultFont", 22, "bold"),
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
 
         ttk.Label(page, text="Input folder:").grid(
             row=1, column=0, sticky="w", padx=(0, 10), pady=6
         )
-        ttk.Entry(page, textvariable=input_dir).grid(
+        ttk.Entry(page, textvariable=self.crop_input_dir).grid(
             row=1, column=1, sticky="ew", pady=6
         )
         ttk.Button(
             page,
             text="Browse…",
             bootstyle="secondary",
-            command=lambda n=name: self.choose_folder_for_page(n),
+            command=self.choose_crop_folder,
         ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
-        files_frame, file_list = self._new_file_list(page)
+        files_frame, self.crop_file_list = self._new_file_list(page)
         files_frame.grid(
             row=2,
             column=0,
-            columnspan=3,
+            sticky="nsew",
+            padx=(0, 12),
+            pady=(12, 16),
+        )
+
+        self.crop_plot_frame = ttk.Frame(page)
+        self.crop_plot_frame.grid(
+            row=2,
+            column=1,
+            columnspan=2,
             sticky="nsew",
             pady=(12, 16),
         )
+        self.crop_tool = ContourCropper(self.crop_plot_frame)
 
         ttk.Label(page, text="Output directory:").grid(
             row=3, column=0, sticky="w", padx=(0, 10), pady=6
         )
-        ttk.Entry(page, textvariable=output_dir).grid(
+        ttk.Entry(page, textvariable=self.crop_output_dir).grid(
             row=3, column=1, sticky="ew", pady=6
         )
         ttk.Button(
             page,
             text="Browse…",
             bootstyle="secondary",
-            command=lambda var=output_dir: self.choose_output_directory(var),
+            command=self.choose_crop_output_folder,
         ).grid(row=3, column=2, padx=(8, 0), pady=6)
-
-        status = ttk.Label(page, text="Ready")
-        status.grid(row=4, column=1, sticky="w", padx=10)
-
-        run_button = ttk.Button(
-            page,
-            text=f"Run {name}",
-            bootstyle="success",
-            command=lambda n=name: self.run_folder_script(n),
-        )
-        run_button.grid(row=4, column=0, sticky="w", pady=(16, 0))
-        self.run_buttons.append(run_button)
-
-        self.file_pages[name] = {
-            "input_dir": input_dir,
-            "output_dir": output_dir,
-            "file_list": file_list,
-            "status": status,
-            "script": script_path,
-        }
 
     def _build_mask_page(self):
         page = ttk.Frame(self.page_area, padding=24)
@@ -705,6 +698,15 @@ class App(ttk.Window):
         self._populate_file_list(self.contrast_file_list, folder)
         self._load_contrast_folder_if_ready()
 
+    def choose_crop_folder(self):
+        folder = filedialog.askdirectory(title="Select Crop input folder")
+        if not folder:
+            return
+
+        self.crop_input_dir.set(folder)
+        self._populate_file_list(self.crop_file_list, folder)
+        self._load_crop_folder()    
+
     def choose_mask_folder(self):
 
         # Ask for input folder
@@ -737,7 +739,6 @@ class App(ttk.Window):
         self.mask_output_dir.set(folder)
         self._load_mask_folder()
 
-    
     def choose_contrast_output_folder(self):
 
         folder = filedialog.askdirectory(
@@ -749,6 +750,18 @@ class App(ttk.Window):
 
         self.contrast_output_dir.set(folder)
         self._load_contrast_folder_if_ready()
+
+    def choose_crop_output_folder(self):
+    
+        folder = filedialog.askdirectory(
+            title="Choose output directory",
+            mustexist=False,
+        )
+        if not folder:
+            return
+
+        self.crop_output_dir.set(folder)
+        self._load_crop_folder()
 
     def ensure_output_directory(self, directory):
         """Create the output directory if it doesn't exist."""
@@ -869,6 +882,7 @@ class App(ttk.Window):
 
         self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
 
+    ### Spaghetti // these are the same script - make them one single method (same for page build + input/output choice)
     def _load_contrast_folder_if_ready(self):
         input_dir = self.contrast_input_dir.get().strip()
         output_dir = self.contrast_output_dir.get().strip()
@@ -881,6 +895,19 @@ class App(ttk.Window):
             output_dir,
             self.storage["path_ffmpeg"],
         )
+
+    def _load_crop_folder(self):
+            input_dir = self.crop_input_dir.get().strip()
+            output_dir = self.crop_output_dir.get().strip()
+    
+            if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
+                return
+    
+            self.crop_tool.load_folder(
+                input_dir,
+                output_dir,
+                self.storage["path_ffmpeg"],
+            )
 
     def _load_mask_folder(self):
         input_dir = self.mask_input_dir.get().strip()
