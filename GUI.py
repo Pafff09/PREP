@@ -786,7 +786,7 @@ class App(ttk.Window):
         input_dir = self.mask_input_dir.get().strip()
         output_dir = self.mask_output_dir.get().strip()
 
-        if not input_dir or not Path(input_dir).is_dir() or not output_dir:
+        if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
             return
 
         self.mask_tool.load_folder(
