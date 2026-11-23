@@ -42,6 +42,7 @@ class App(ttk.Window):
         self.title("PREP")
         self.geometry("1600x900")
         self.minsize(720, 520)
+        self.state('zoomed')
 
          # Read JSON file
         with open(PAHT_STORAGE, "r") as file:
@@ -132,42 +133,35 @@ class App(ttk.Window):
         page.grid_columnconfigure(1, weight=1)
         self.pages["Home"] = page
 
-        ttk.Label(page,
-                  text="Default options for the program",
-                  font=("TkDefaultFont", 16, "bold"),
-                  wraplength=700
+        ttk.Label(page, text="Setting up PREP", font=("TkDefaultFont", 16, "bold"), wraplength=700
                   ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
 
         ### ffmpeg path ###
-        self.ffmpeg_exe_label = ttk.Label(page, text="FFMPEG path:")
-        self.ffmpeg_exe_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(page,
-                  textvariable=self.ffmpeg_exe_path
-                  ).grid(row=1, column=1, sticky="ew", pady=6)
-        ttk.Button(page,
-                   text="Find...",
-                   bootstyle="secondary",
-                   command=self.chose_ffmpeg_path,
+        ttk.Label(page, text="FFMPEG path::"
+                          ).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(page, textvariable=self.cap_output_dir
+                    ).grid(row=1, column=1, sticky="ew", pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=lambda: self.chose_ffmpeg_path
                     ).grid(row=1, column=2, padx=(8, 0), pady=6)
-        if self.ffmpeg_exe_path.get().strip() != "":
-            self.ffmpeg_exe_label.config(icon="check", bootstyle="success")
 
         ### set up ###
         def ensure_requirements():
             response = subprocess.run(["python", SETUP_SCRIPT], capture_output=True, check=False)
 
             if response.returncode != 0:
-                messagebox.showerror("ERROR" ,"Failed to install requirements", parent=self)
+                messagebox.showerror("Error" ,"Failed to install requirements", parent=self)
                 return
             else:
-                messagebox.showinfo("SUCCESS", "Requirements have been installed", parent=self)
+                messagebox.showinfo("Success", "Requirements have been installed", parent=self)
                 return 
 
-        ttk.Label(page, text="Install dependencies (Reccomended if you do not know how to do it!)"
+        self.command_install_dependencies = ttk.StringVar(value="pip install -r requirements.txt")
+        ttk.Label(page, text="Install dependencies"
                   ).grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
-        ttk.Button(page,
-                    text="Install setup",
-                    bootstyle="secondary",
+        ttk.Entry(page, textvariable=self.command_install_dependencies,
+                ).grid(row=2, column=1, sticky="ew", pady=6)
+        ttk.Button(page, icon="download", bootstyle="secondary",
                     command=ensure_requirements,
                     ).grid(row=2, column=2, padx=(8, 0), pady=6)
 
@@ -199,7 +193,7 @@ class App(ttk.Window):
                   ).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Entry(page, textvariable=self.cap_input_dir
                   ).grid(row=1, column=1, sticky="ew", pady=6)
-        ttk.Button(page, text="Browse…", bootstyle="secondary", command=self.choose_cap_folder
+        ttk.Button(page, icon="folder", bootstyle="secondary", command=self.choose_cap_folder
                    ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         # Tree viewer
@@ -211,12 +205,9 @@ class App(ttk.Window):
                   ).grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Entry(page, textvariable=self.cap_output_dir
                   ).grid(row=3, column=1, sticky="ew", pady=6)
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=lambda: self.choose_output_directory(self.cap_output_dir)
-            ).grid(row=3, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                   command=lambda: self.choose_output_directory(self.cap_output_dir)
+                  ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
         # Desired FPS 
         ttk.Label(page, text="Desired frame count:"
@@ -257,12 +248,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.letter_input_dir).grid(
             row=1, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=lambda: self.choose_folder_for_page("Letter Box"),
-        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=lambda: self.choose_folder_for_page("Letter Box"),
+                    ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         files_frame, file_list = self._new_file_list(page)
         files_frame.grid(
@@ -279,12 +267,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.letter_output_dir).grid(
             row=3, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=lambda: self.choose_output_directory(self.letter_output_dir),
-        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=lambda: self.choose_output_directory(self.letter_output_dir),
+                  ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
         ### Width & Height ###
         ttk.Label(page, text="Letterbox Width:"
@@ -341,12 +326,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.contrast_input_dir).grid(
             row=1, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_contrast_folder,
-        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_contrast_folder,
+                  ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         files_frame, self.contrast_file_list = self._new_file_list(page)
         files_frame.grid(
@@ -373,12 +355,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.contrast_output_dir).grid(
             row=3, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_contrast_output_folder,
-        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_contrast_output_folder,
+                   ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
     def _build_crop_page(self):
 
@@ -405,12 +384,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.crop_input_dir).grid(
             row=1, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_crop_folder,
-        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_crop_folder,
+                  ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         files_frame, self.crop_file_list = self._new_file_list(page)
         files_frame.grid(
@@ -437,12 +413,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.crop_output_dir).grid(
             row=3, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_crop_output_folder,
-        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_crop_output_folder,
+                  ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
     def _build_mask_page(self):
         page = ttk.Frame(self.page_area, padding=24)
@@ -469,12 +442,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.mask_input_dir).grid(
             row=1, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_mask_folder,
-        ).grid(row=1, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_mask_folder,
+                  ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         files_frame, self.mask_file_list = self._new_file_list(page)
         files_frame.grid(
@@ -501,12 +471,9 @@ class App(ttk.Window):
         ttk.Entry(page, textvariable=self.mask_output_dir).grid(
             row=3, column=1, sticky="ew", pady=6
         )
-        ttk.Button(
-            page,
-            text="Browse…",
-            bootstyle="secondary",
-            command=self.choose_mask_output_folder,
-        ).grid(row=3, column=2, padx=(8, 0), pady=6)
+        ttk.Button(page, icon="folder", bootstyle="secondary",
+                    command=self.choose_mask_output_folder,
+                   ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
         self.mask_tool = AddMask(self.mask_plot_frame)
 
