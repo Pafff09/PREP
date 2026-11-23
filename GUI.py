@@ -42,7 +42,6 @@ class App(ttk.Window):
         self.title("PREP")
         self.geometry("1600x900")
         self.minsize(720, 520)
-        self.state('zoomed')
 
          # Read JSON file
         with open(PAHT_STORAGE, "r") as file:
@@ -500,7 +499,7 @@ class App(ttk.Window):
                 show="headings",
                 height=10,
             )
-            tree.heading("filename", text="Add a directory containing the files of interest")
+            tree.heading("filename", text="Add a folder")
             tree.column("filename", anchor="w")
             tree.grid(row=0, column=0, sticky="nsew")
 
@@ -518,8 +517,8 @@ class App(ttk.Window):
     def _populate_file_list(self, tree, folder, which=None):
         
         # Intercalate colors in the rows
-        tree.tag_configure("odd", background="#666666")
-        tree.tag_configure("even", background="#333333")
+        tree.tag_configure("odd", background="#676767")
+        tree.tag_configure("even", background="#343434")
 
         # Format the label of the size of the file
         def format_size(size_bytes):
