@@ -696,7 +696,7 @@ class App(ttk.Window):
 
         self.contrast_input_dir.set(folder)
         self._populate_file_list(self.contrast_file_list, folder)
-        self._load_contrast_folder_if_ready()
+        self._load_contrast_folder()
 
     def choose_crop_folder(self):
         folder = filedialog.askdirectory(title="Select Crop input folder")
@@ -749,7 +749,7 @@ class App(ttk.Window):
             return
 
         self.contrast_output_dir.set(folder)
-        self._load_contrast_folder_if_ready()
+        self._load_contrast_folder()
 
     def choose_crop_output_folder(self):
     
@@ -883,7 +883,7 @@ class App(ttk.Window):
         self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
 
     ### Spaghetti // these are the same script - make them one single method (same for page build + input/output choice)
-    def _load_contrast_folder_if_ready(self):
+    def _load_contrast_folder(self):
         input_dir = self.contrast_input_dir.get().strip()
         output_dir = self.contrast_output_dir.get().strip()
 

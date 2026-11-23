@@ -64,6 +64,9 @@ class ContourCropper:
         self.fig = Figure(figsize=(8, 5))
         self.ax = self.fig.add_subplot(111)
         self.fig.subplots_adjust(left=0.28, right=0.72, top=0.95, bottom=0.05)
+        self.ax.set_axis_off()
+        self.ax.text(0.5, 0.5, "Load both input and output",
+                    ha="center", va="center", transform=self.ax.transAxes)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
