@@ -145,23 +145,13 @@ class App(ttk.Window):
                     ).grid(row=1, column=2, padx=(8, 0), pady=6)
 
         ### set up ###
-        def ensure_requirements():
-            response = subprocess.run(["python", SETUP_SCRIPT], capture_output=True, check=False)
-
-            if response.returncode != 0:
-                messagebox.showerror("Error" ,"Failed to install requirements", parent=self)
-                return
-            else:
-                messagebox.showinfo("Success", "Requirements have been installed", parent=self)
-                return 
-
         self.command_install_dependencies = ttk.StringVar(value="pip install -r requirements.txt")
         ttk.Label(page, text="Install dependencies"
                   ).grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
         ttk.Entry(page, textvariable=self.command_install_dependencies,
                 ).grid(row=2, column=1, sticky="ew", pady=6)
         ttk.Button(page, icon="download", bootstyle="secondary",
-                    command=ensure_requirements,
+                    command=self.ensure_requirements,
                     ).grid(row=2, column=2, padx=(8, 0), pady=6)
 
         ### user configs (os, env) ###
@@ -624,6 +614,16 @@ class App(ttk.Window):
         with open(PAHT_STORAGE, 'w') as file:
             self.storage["path_ffmpeg"] = exe
             json.dump(self.storage, file, indent=2)
+
+    def ensure_requirements(self):
+        response = subprocess.run(["python", SETUP_SCRIPT], capture_output=True, check=False)
+
+        if response.returncode != 0:
+            messagebox.showerror("Error" ,"Failed to install requirements", parent=self)
+            return
+        else:
+            messagebox.showinfo("Success", "Requirements have been installed", parent=self)
+            return 
 
     ''' INPUT DIRECTORY  '''
     def choose_cap_folder(self):
