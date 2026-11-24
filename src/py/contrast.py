@@ -235,8 +235,11 @@ class Contrast:
         self.run_script()
 
         if self.index >= len(self.files) - 1:
-            self.show_message("No more files")
-            return
+            self.frame = None
+            self.ax.clear()
+            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}", ha="center", va="center", transform=self.ax.transAxes)
+            self.ax.set_axis_off()
+            self.canvas.draw_idle()
 
         self.frame_inx = 0
         self.show_frame(self.index + 1)

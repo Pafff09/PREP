@@ -131,6 +131,8 @@ class ContourCropper:
         self.frame_inx = 0
         self.show_frame(self.index)
 
+### Manual mode ###
+
     def start_manual_box(self):
         self.drawing_manual_box = True
         self.manual_drag_start = None
@@ -219,6 +221,8 @@ class ContourCropper:
         else:
             self.redraw()
 
+### Contours ###
+
     def find_contours(self):
         edges = cv2.Canny(
             self.blurred_frame,
@@ -287,6 +291,8 @@ class ContourCropper:
             )
 
         self.canvas.draw_idle()
+
+### General ###
 
     def show_frame(self, index):
         self.index = index
@@ -576,10 +582,13 @@ class ContourCropper:
 
         self.crop_current_frame()
 
+        # If it is the last, clear ax
         if self.index >= len(self.files) - 1:
-            self.ax.set_title("Finished")
+            self.frame = None
+            self.ax.clear()
+            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}", ha="center", va="center", transform=self.ax.transAxes)
+            self.ax.set_axis_off()
             self.canvas.draw_idle()
-            return
 
         self.index += 1
         self.frame_inx = 0
