@@ -2,9 +2,11 @@ from pathlib import Path
 import subprocess
 import sys
 
+PATH_REQUIREMENTS = "requirements.txt"
+
 def main():
     # Get requirements.txt path
-    requirements = Path(__file__).resolve().parent.parent.parent / "requirements.txt"
+    requirements = Path(__file__).resolve().parent.parent.parent / PATH_REQUIREMENTS
 
     # Check pip is installed for this py interp
     pip_response = subprocess.run([sys.executable, "-m", "pip", "--version"], capture_output=True, text=True)

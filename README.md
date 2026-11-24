@@ -5,7 +5,7 @@
 <h1 align="center">Preprocess Recordings of Ethological Protocols (PREP).</h1>
 
 GUI-based pipeline using FFMPEG allowing for the pre-process of standardised behavioural protocol recordings. 
-It allows for easier video pre-processing and faster dataset preparation for machine learning algorithms. 
+Used for easier and faster dataset preparation for machine learning algorithms and statistical analysis. 
 
 <div style="text-align: center;">
   <img src="./assets/features.png" width="1600" style="display: block; margin: 0 auto;">
@@ -17,11 +17,11 @@ It allows for easier video pre-processing and faster dataset preparation for mac
 
 - Clone this repository
 
+- Run ```src/py/setup.py``` to set up dependencies (or type ```python install -r requirements.txt```)
+
 - Run ```GUI.py```
 
 - In home page (default) set FFMPEG.exe path (in FFMPEG directory ```bin\ffmpeg.exe```)
-
-- In home page (default) install dependencies (or do it manually with ```pip install -r requirements.txt``` )
 
 ### System Requirements
 

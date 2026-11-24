@@ -13,6 +13,7 @@ from src.py.mask import AddMask
 
 ### General paths ###
 PAHT_STORAGE = os.path.join("storage", "paths.json")
+PATH_REQUIREMENTS = "requirements.txt"
 
 ### Python Scripts ###
 CONTRAST_SCRIPT = os.path.join("src", "py", "contrast.py")
@@ -49,10 +50,6 @@ class App(ttk.Window):
 
         # Home page
         self.ffmpeg_exe_path = tk.StringVar()
-
-        # Check for existing variables in STORAGE
-        if self.storage["path_ffmpeg"] != "":
-            self.ffmpeg_exe_path.set(self.storage["path_ffmpeg"])
         
         # General parameters for repetitive pages
         self.pages = {}
@@ -136,23 +133,39 @@ class App(ttk.Window):
                   ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 18))
 
         ### ffmpeg path ###
-        ttk.Label(page, text="FFMPEG path::"
-                          ).grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(page, textvariable=self.cap_output_dir
+        self.ffmpeg_exe_label = ttk.Label(page, text="FFMPEG path::")
+        self.ffmpeg_exe_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(page, textvariable=self.ffmpeg_exe_path
                     ).grid(row=1, column=1, sticky="ew", pady=6)
         ttk.Button(page, icon="folder", bootstyle="secondary",
-                    command=lambda: self.chose_ffmpeg_path
+                    command=lambda: self.chose_ffmpeg_path()
                     ).grid(row=1, column=2, padx=(8, 0), pady=6)
+
+        # Check for existing ffmpeg path in storage and if it still functional
+        if self.storage["path_ffmpeg"] != "":
+            self.ffmpeg_exe_path.set(self.storage["path_ffmpeg"])
+            if self.test_ffmpeg_path(self.storage["path_ffmpeg"]) == 0:
+                self.ffmpeg_exe_label.config(icon="check", bootstyle="success")
+            else:
+                self.ffmpeg_exe_label.config(icon="file-earmark-excel", bootstyle="danger")
 
         ### set up ###
         self.command_install_dependencies = ttk.StringVar(value="pip install -r requirements.txt")
-        ttk.Label(page, text="Install dependencies"
-                  ).grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
+        self.dependencies_label =  ttk.Label(page, text="Install dependencies")
+        self.dependencies_label.grid(row=2, column=0, columnspan=2, padx=(0, 0), pady=6, sticky="w")
         ttk.Entry(page, textvariable=self.command_install_dependencies,
                 ).grid(row=2, column=1, sticky="ew", pady=6)
         ttk.Button(page, icon="download", bootstyle="secondary",
                     command=self.ensure_requirements,
                     ).grid(row=2, column=2, padx=(8, 0), pady=6)
+
+         # Checking if libraries are installed in the current python version
+        if self.test_requirements() == 1:
+            self.dependencies_label.config(icon="exclamation-triangle", bootstyle="warning")
+        else:
+            self.dependencies_label.config(icon="check", bootstyle="success")
+        
+        self.pages["Home"] = page
 
         ### user configs (os, env) ###
         ttk.Label(page, text="User's configs", font=("TkDefaultFont", 14, "bold"),
@@ -161,8 +174,7 @@ class App(ttk.Window):
                   ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(0, 10))
         ttk.Label(page, text=f"Detected user's virtualenv || {sys.prefix}"
                 ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 10))
-        
-        self.pages["Home"] = page
+
 
     def _build_cap_fps_page(self):
 
@@ -572,47 +584,72 @@ class App(ttk.Window):
 
     ''' SETUP METHODS '''
 
-    def chose_ffmpeg_path(self):
-        # Ask for the name of the ffmpeg file
-        exe = filedialog.askopenfilename(title="Select ffmpeg.exe")
+    def test_ffmpeg_path(self, path):
 
-        # If nothing is selected, do not run the rest
-        if not exe:
-            return
+        bin_path = os.path.abspath(os.path.dirname(path))
 
         ### Test if ffmpeg path provided is functional ###
         # Linux and Mac #
         if user_operating_system in ["linux", "linux2", "darwin"]:
-            command = ["sh", TEST_SETTINGS_SCRIPT, *[exe]]
+            command = ["sh", TEST_SETTINGS_SCRIPT, *[bin_path]]
         # Windows #
         elif user_operating_system in ["win32"]:
-            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", TEST_SETTINGS_SCRIPT, *[exe]]
+            command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", TEST_SETTINGS_SCRIPT, *[bin_path]]
 
         # Run the command
-        response = subprocess.run(
-                        command,
-                        capture_output=True,
-                        text=True,
-                        check=False)
+        response = subprocess.run(command, capture_output=True, text=True, check=False)
 
-        # If errors,
-        if response.returncode != 0:
+        # If there is an error, return 1
+        if "ffmpeg version" not in response.stdout:
             messagebox.showerror(
                 "Invalid .exe",
-                "The path provided does not act as bin/ffmpeg.exe",
+                f"{path} does not act as ffmpeg.exe",
                 parent=self,
-            )
+                )
+            return 1
+        # Else return 0
+        else:
+            return 0
+
+    def test_requirements(self):
+
+        response = str(subprocess.run(["python", "-m", "pip", "list"], capture_output=True, check=False).stdout)
+
+        with open(PATH_REQUIREMENTS, "r") as file:
+            for line in file.readlines():
+
+                # Omit version from check
+                if "=" in line:
+                    line = line[:line.index("=")]
+
+                # If at least once libraries from the requirements is not installed: warning
+                if line[:-1] not in response:
+                    print(f"{line[:-1]} not installed")
+                    return 1
+
+        return 0
+
+    def chose_ffmpeg_path(self):
+        # Ask for the name of the ffmpeg file
+        path_exe = filedialog.askopenfilename(title="Select ffmpeg.exe")
+
+        # If nothing is selected, do not run the rest
+        if not path_exe:
+            return
+
+        # Test ffmpeg path provided
+        if self.test_ffmpeg_path(path_exe) == 1:
             return
         
         # Set is as the entry value
-        self.ffmpeg_exe_path.set(exe)
+        self.ffmpeg_exe_path.set(path_exe)
 
         # Change label to reflect it works
         self.ffmpeg_exe_label.config(icon="check", bootstyle="success")
 
         # Save to the JSON file for re-use
         with open(PAHT_STORAGE, 'w') as file:
-            self.storage["path_ffmpeg"] = exe
+            self.storage["path_ffmpeg"] = path_exe
             json.dump(self.storage, file, indent=2)
 
     def ensure_requirements(self):
@@ -623,6 +660,7 @@ class App(ttk.Window):
             return
         else:
             messagebox.showinfo("Success", "Requirements have been installed", parent=self)
+            self.test_requirements()
             return 
 
     ''' INPUT DIRECTORY  '''
@@ -715,7 +753,7 @@ class App(ttk.Window):
             return
 
         self.contrast_output_dir.set(folder)
-        self._load_contrast_folder()
+        self.load_external_python_scripts(self.mask_input_dir, self.mask_output_dir, self.mask_tool)
 
     def choose_crop_output_folder(self):
     
@@ -849,6 +887,20 @@ class App(ttk.Window):
         self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
 
     ### Spaghetti // these are the same script - make them one single method (same for page build + input/output choice)
+
+    def load_external_python_scripts(self, input, output, tool):
+        input_dir = input.get().strip()
+        output_dir = output.get().strip()
+        
+        if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
+            return
+
+        tool.load_folder(
+            input_dir,
+            output_dir,
+            self.storage["path_ffmpeg"],
+        )
+
     def _load_contrast_folder(self):
         input_dir = self.contrast_input_dir.get().strip()
         output_dir = self.contrast_output_dir.get().strip()

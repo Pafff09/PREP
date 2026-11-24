@@ -1,6 +1,7 @@
 #!/bin/bash
 
-### Load the provided ffmpeg path ###
-ffmpeg=$1
+### Load the provided ffmpeg bin path ###
+Ffmpeg_bin_path=$1
 
-$ffmpeg -version
+### Get version ###
+$Ffmpeg_bin_path\ffmpeg.exe -version

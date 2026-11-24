@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Ffmpeg
+    [string]$Ffmpeg_bin_path
 )
 
 # Get version to test FFMPEG works
-& $Ffmpeg -version
+& $Ffmpeg_bin_path\ffmpeg.exe -version
