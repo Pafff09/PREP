@@ -19,5 +19,5 @@ fi
 cd "$INPUT"
 for file in *
 do
-    $ffmpeg -i $file -filter:v fps=$NEW_VIDEO_FPS $OUTPUT_DIR/cap_$file.mp4
+    $ffmpeg -y -i $file -filter:v fps=$NEW_VIDEO_FPS $OUTPUT_DIR/cap_$file.mp4
 done

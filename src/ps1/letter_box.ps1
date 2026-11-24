@@ -22,5 +22,5 @@ $filter = "scale=(iw*sar)*min($Width/(iw*sar)\,$Height/ih):ih*min($Width/(iw*sar
 # Run FFMPEG
 Get-ChildItem -LiteralPath $InputDir -File | ForEach-Object {
     $outputFile = Join-Path $OutputDir $_.Name
-    & $Ffmpeg -i $_.FullName -vf $filter $outputFile
+    & $Ffmpeg -y -i $_.FullName -vf $filter $outputFile
 }

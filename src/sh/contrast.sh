@@ -14,4 +14,4 @@ CONTRAST=$6
 cd $OUTPUT_DIR
 
 ### Change brightness and contrast
-$ffmpeg -i $INPUT -vf "eq=brightness=$BRIGHTNESS:contrast=$CONTRAST" $NAME.mp4
+$ffmpeg -y -i $INPUT -vf "eq=brightness=$BRIGHTNESS:contrast=$CONTRAST" $NAME.mp4

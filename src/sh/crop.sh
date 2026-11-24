@@ -1,28 +1,20 @@
 #!/bin/bash
 
-### Load ffmpeg ###
+# Parameters
 ffmpeg=$1
+input=$2
+output_dir=$3
+filename=$4
+x=$5
+y=$6
+width=$7
+height=$8
 
-### ARGS ###
-INPUT=$2
-COORDS=$3
-OUTPUT_DIR=$4
-NAMES=$5
+# Filter
+filter="crop=${width}:${height}:${x}:${y}"
 
-# Go to output directory to facilitate pathing for saving
-cd "$OUTPUT_DIR"
+# Output file
+output_file="${output_dir%/}/${filename}_cropped.mp4"
 
-# Parse the Coordinates & Names
-IFS='/' read -a array_coords <<< "$COORDS"
-IFS='/' read -a array_names <<< "$NAMES"
-
-declare -i i=0
-for coords in "${array_coords[@]}"; do 
-    ((i=i+1))
-
-    coord=${coords:1:-1}
-    IFS=', ' read -a array2 <<< "$coord"
-
-    $ffmpeg -i $INPUT -filter:v crop=${array2[2]}:${array2[3]}:${array2[0]}:${array2[1]} ${array_names[i-1]}_croped.mp4
-
-done
+# FFMPEG - overwrite the existing same name files
+$ffmpeg" -y -i "$input" -vf "$filter" "$output_file"

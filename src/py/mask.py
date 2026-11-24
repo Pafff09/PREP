@@ -6,6 +6,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 
+from src.py.queue_commands import QueueJobs
+
 class AddMask:
     def __init__(self, parent, terminal):
 
@@ -13,10 +15,7 @@ class AddMask:
         self.terminal = terminal
 
         # Queueing jobs 
-        self.output_queue = queue.Queue()
-        self.pending_jobs = []
-        self.mask_running = False
-        self.output_polling = False
+        self.mask_queue = QueueJobs(self.parent, terminal)
 
         self.input_dir = ""
         self.output_dir = ""
@@ -148,86 +147,7 @@ class AddMask:
                        "-File", self.mask_script, *parameters,]
 
         # Append the new command and either start it, or queue it
-        self.pending_jobs.append((filename, command))
-        self._start_next_mask_job()
-        self._schedule_output_poll()
-
-    ''' Queueing jobs methods '''
-
-    def _start_next_mask_job(self):
-        if self.mask_running or not self.pending_jobs:
-            return
-
-        filename, command = self.pending_jobs.pop(0)
-        self.mask_running = True
-
-        self.terminal.configure(state="normal")
-        self.terminal.insert("end", f"\nStarting: {filename}\n")
-        self.terminal.see("end")
-        self.terminal.configure(state="disabled")
-
-        threading.Thread(
-            target=self._run_mask_command,
-            args=(command,),
-            daemon=True,
-        ).start()
-
-    def _schedule_output_poll(self):
-        if not self.output_polling:
-            self.output_polling = True
-            self.parent.after(100, self._drain_output_queue)
-
-    def _drain_output_queue(self):
-        try:
-            while True:
-                event, value = self.output_queue.get_nowait()
-
-                if event == "output":
-                    self.terminal.configure(state="normal")
-                    self.terminal.insert("end", value)
-                    self.terminal.see("end")
-                    self.terminal.configure(state="disabled")
-
-                elif event == "done":
-                    status = "completed" if value == 0 else f"failed (exit code: {value})"
-
-                    self.terminal.configure(state="normal")
-                    self.terminal.insert("end", f"\nJob {status}.\n")
-                    self.terminal.see("end")
-                    self.terminal.configure(state="disabled")
-
-                    self.mask_running = False
-                    self._start_next_mask_job()
-
-        except queue.Empty:
-            pass
-
-        if self.mask_running or self.pending_jobs:
-            self.parent.after(100, self._drain_output_queue)
-        else:
-            self.output_polling = False
-
-    ''' Running jobs methods '''
-
-    def _run_mask_command(self, command):
-        try:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-
-            for line in process.stdout:
-                self.output_queue.put(("output", line))
-
-            return_code = process.wait()
-            self.output_queue.put(("done", return_code))
-
-        except Exception as error:
-            self.output_queue.put(("output", f"Error: {error}\n"))
-        self.output_queue.put(("done", None))
+        self.mask_queue.add(command, label=filename)
 
     ''' Handle events in the PLT methods '''
 
@@ -247,10 +167,12 @@ class AddMask:
         if event.key == "right":
             self.frame_inx += 1
             self.show_frame(self.index)
+            
         elif event.key == "left":
             if self.frame_inx > 0:
                 self.frame_inx -= 1
                 self.show_frame(self.index)
+
         elif event.key == "enter":
 
             # If input, output or ffmpeg are missing - do not run 
@@ -268,6 +190,6 @@ class AddMask:
             else:
                 self.frame = None
                 self.ax.clear()
-                self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}", ha="center", va="center", transform=self.ax.transAxes)
+                self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}\n Wait for the queued files to be processed", ha="center", va="center", transform=self.ax.transAxes)
                 self.ax.set_axis_off()
                 self.canvas.draw_idle()

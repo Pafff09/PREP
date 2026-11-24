@@ -21,4 +21,4 @@ param(
 $filter = "eq=brightness=$Brightness`:contrast=$Contrast"
 $outputFile = Join-Path $OutputDir "$Name.mp4"
 
-& $Ffmpeg -i $In -vf $filter $outputFile
+& $Ffmpeg -y -i $In -vf $filter $outputFile

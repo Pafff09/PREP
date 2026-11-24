@@ -10,11 +10,17 @@ import ttkbootstrap as ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from src.py.queue_commands import QueueJobs
 
 class Contrast:
-    def __init__(self, parent):
+    def __init__(self, parent, terminal):
         
         self.parent = parent
+        self.terminal = terminal
+
+        # Queueing jobs 
+        self.contrast_queue = QueueJobs(self.parent, terminal)
+
         self.input_dir = ""
         self.output_dir = ""
         self.ffmpeg_exe = ""
@@ -189,14 +195,10 @@ class Contrast:
         name = os.path.splitext(name)[0]
 
         eq_values = self.ffmpeg_eq_filter()
-        parameters = [
-            self.ffmpeg_exe,
-            self.path,
-            name,
-            self.output_dir,
-            str(eq_values[0]),
-            str(eq_values[1]),
-        ]
+        parameters = [self.ffmpeg_exe, self.path, name, self.output_dir,
+                      str(eq_values[0]), str(eq_values[1])]
+
+        filename = os.path.splitext(self.files[self.index])[0]
 
         if self.user_operating_system in ("linux", "linux2", "darwin"):
             command = ["sh", self.contrast_script, *parameters]
@@ -211,12 +213,10 @@ class Contrast:
                 *parameters,
             ]
 
-        subprocess.run(command, check=False)
+        # Append the new command and either start it, or queue it
+        self.contrast_queue.add(command, label=filename)
 
     def on_key_press(self, event):
-        if event.key == "escape":
-            self.show_message("Contrast preview closed")
-            return
 
         if event.key == "right":
             self.frame_inx += 1
@@ -234,12 +234,13 @@ class Contrast:
 
         self.run_script()
 
-        if self.index >= len(self.files) - 1:
+        if self.index < len(self.files) - 1:
+            self.frame_inx = 0
+            self.show_frame(self.index + 1)
+
+        else:
             self.frame = None
             self.ax.clear()
-            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}", ha="center", va="center", transform=self.ax.transAxes)
+            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}\n Wait for the queued files to be processed", ha="center", va="center", transform=self.ax.transAxes)
             self.ax.set_axis_off()
             self.canvas.draw_idle()
-
-        self.frame_inx = 0
-        self.show_frame(self.index + 1)

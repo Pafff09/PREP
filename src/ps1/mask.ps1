@@ -32,4 +32,4 @@ $filter = "drawbox=x=$X0`:y=$Y0`:w=$Width`:h=$Height`:color=black`:t=fill"
 $outputFile = Join-Path $OutputDir "masked_${Name}.mp4"
 
 # Run FFMPEG
-& $Ffmpeg -i $In -vf $filter $outputFile
+& $Ffmpeg -y -i $In -vf $filter $outputFile

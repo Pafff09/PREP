@@ -356,7 +356,6 @@ class App(ttk.Window):
             sticky="nsew",
             pady=(12, 16),
         )
-        self.contrast_tool = Contrast(self.contrast_plot_frame)
 
         ttk.Label(page, text="Output directory:").grid(
             row=3, column=0, sticky="w", padx=(0, 10), pady=6
@@ -367,6 +366,8 @@ class App(ttk.Window):
         ttk.Button(page, icon="folder", bootstyle="secondary",
                     command=self.choose_contrast_output_folder,
                    ).grid(row=3, column=2, padx=(8, 0), pady=6)
+
+        self.contrast_tool = Contrast(self.contrast_plot_frame, self.terminal)
 
     def _build_crop_page(self):
 
@@ -414,7 +415,7 @@ class App(ttk.Window):
             sticky="nsew",
             pady=(12, 16),
         )
-        self.crop_tool = ContourCropper(self.crop_plot_frame)
+        self.crop_tool = ContourCropper(self.crop_plot_frame, self.terminal)
 
         ttk.Label(page, text="Output directory:").grid(
             row=3, column=0, sticky="w", padx=(0, 10), pady=6
@@ -892,8 +893,6 @@ class App(ttk.Window):
             output_dir,
             self.storage["path_ffmpeg"],
         )
-
-        print(command)
 
     ''' General run scripts '''
 

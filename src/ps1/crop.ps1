@@ -6,30 +6,30 @@ param(
     [string]$In,
 
     [Parameter(Mandatory = $true)]
-    [string]$Coords,
-
-    [Parameter(Mandatory = $true)]
     [string]$OutputDir,
 
     [Parameter(Mandatory = $true)]
-    [string]$Names
+    [string]$Filename,
+
+    [Parameter(Mandatory = $true)]
+    [int]$X,
+
+    [Parameter(Mandatory = $true)]
+    [int]$Y,
+
+    [Parameter(Mandatory = $true)]
+    [int]$Width,
+
+    [Parameter(Mandatory = $true)]
+    [int]$Height
+
 )
 
-$coordList = $Coords -split '/'
-$nameList = $Names -split '/'
+# Create the filter
+$filter = "crop=${Width}:${Height}:${X}:${Y}"
 
-for ($i = 0; $i -lt $coordList.Count; $i++) {
-    
-    # Remove the first and last character, then split on commas or spaces
-    $coord = $coordList[$i].Substring(1, $coordList[$i].Length - 2)
-    $values = $coord -split '[,\s]+'
+# Create the output path
+$outputFile = Join-Path $OutputDir "${Filename}_cropped.mp4"
 
-    # Create filter
-    $filter = "crop=$($values[2]):$($values[3]):$($values[0]):$($values[1])"
-
-    # Create output file
-    $outputFile = Join-Path $OutputDir "$($nameList[$i])_croped.mp4"
-
-    # Run FFMPEG
-    & $Ffmpeg -i $In -filter:v $filter $outputFile
-}
+# Will overwrite the file, if the same name is present
+& $Ffmpeg -y -i $In -vf $filter $outputFile

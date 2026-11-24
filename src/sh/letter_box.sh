@@ -15,7 +15,7 @@ for file in *
 do  
     # Resize the video to the desired WIDTH x HEIGHT
     # Add the padding
-    $ffmpeg -i $file\
+    $ffmpeg -y -i $file\
             -vf "scale=(iw*sar)*min($WIDTH/(iw*sar)\,$HEIGHT/ih):ih*min($WIDTH/(iw*sar)\,$HEIGHT/ih),\
             pad=$WIDTH:$HEIGHT:($WIDTH-iw*min($WIDTH/iw\,$HEIGHT/ih))/2:($HEIGHT-ih*min($WIDTH/iw\,$HEIGHT/ih))/2"\
             $OUTPUT_DIR/$file

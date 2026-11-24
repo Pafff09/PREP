@@ -10,10 +10,16 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import Slider, TextBox
 from matplotlib.patches import Rectangle
 
+from src.py.queue_commands import QueueJobs
 
 class ContourCropper:
-    def __init__(self, parent):
+    def __init__(self, parent, terminal):
+        
         self.parent = parent
+        self.terminal = terminal
+
+        # Queueing jobs 
+        self.contrast_queue = QueueJobs(self.parent, terminal)
 
         self.input_dir = ""
         self.output_dir = ""
@@ -212,11 +218,7 @@ class ContourCropper:
             self.manual_preview.remove()
             self.manual_preview = None
 
-        if (
-            event.inaxes == self.ax
-            and event.xdata is not None
-            and event.ydata is not None
-        ):
+        if (event.inaxes == self.ax and event.xdata is not None and event.ydata is not None):
             self.add_manual_box(*start, event.xdata, event.ydata)
         else:
             self.redraw()
@@ -349,9 +351,7 @@ class ContourCropper:
             x1 = min(width, x + box_width + right)
             y1 = min(height, y + box_height + bottom)
 
-            coordinates[contour_index] = (
-                f"({x0}, {y0}, {x1 - x0}, {y1 - y0})"
-            )
+            coordinates[contour_index] = (x0, y0, (x1 - x0), (y1 - y0))
 
         for manual_id in self.selected:
             if manual_id not in self.manual_boxes:
@@ -365,9 +365,7 @@ class ContourCropper:
             right = min(width, x1 + half_buffer)
             bottom = min(height, y1 + half_buffer)
 
-            coordinates[manual_id] = (
-                f"({left}, {top}, {right - left}, {bottom - top})"
-            )
+            coordinates[manual_id] = (left, top, (right - left), (bottom - top))
 
         return coordinates
 
@@ -515,45 +513,29 @@ class ContourCropper:
         self.redraw()
 
     def crop_current_frame(self):
+
         if not self.selected:
             return
 
-        filenames = [
-            self.contour_inputs.get(item_id, "")
-            for item_id in self.selected
-        ]
-        coordinates = [
-            self.selected_coordinates[item_id]
-            for item_id in self.selected
-            if item_id in self.selected_coordinates
-        ]
-
-        parameters = [
-            self.ffmpeg_exe,
-            self.path,
-            "/".join(coordinates),
-            self.output_dir,
-            "/".join(filenames),
-        ]
+        filenames = [self.contour_inputs.get(item_id, "") for item_id in self.selected]
+        coordinates = [self.selected_coordinates[item_id] for item_id in self.selected if item_id in self.selected_coordinates]
 
         if self.user_operating_system in ("linux", "linux2", "darwin"):
-            command = ["sh", self.crop_script, *parameters]
+            command = ["sh", self.crop_script, self.ffmpeg_exe, self.path, self.output_dir]
         elif self.user_operating_system == "win32":
             command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                        "-File", self.crop_script, *parameters]
-            print(command)
-        else:
-            raise RuntimeError(
-                f"Unsupported operating system: {self.user_operating_system}"
-            )
+                        "-File", self.crop_script, self.ffmpeg_exe, self.path, self.output_dir]
 
-        subprocess.run(command, check=False)
+        # For each crop, add it to the queue
+        print(coordinates)
+        for crop in range(len(filenames)):
+            filename = filenames[crop]
+            coords = coordinates[crop]
+            individual_command = command + [filename, str(coords[0]), str(coords[1]), str(coords[2]), str(coords[3])]
+            print(individual_command)
+            self.contrast_queue.add(individual_command, label=filename)
 
     def on_key_press(self, event):
-        if event.key == "escape":
-            self.ax.set_title("Close the application to exit")
-            self.canvas.draw_idle()
-            return
 
         if event.key == "right":
             self.frame_inx += 1
@@ -582,14 +564,14 @@ class ContourCropper:
 
         self.crop_current_frame()
 
-        # If it is the last, clear ax
-        if self.index >= len(self.files) - 1:
+        if self.index < len(self.files) - 1:
+            self.index += 1
+            self.frame_inx = 0
+            self.show_frame(self.index)
+
+        else:
             self.frame = None
             self.ax.clear()
-            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}", ha="center", va="center", transform=self.ax.transAxes)
+            self.ax.text(0.5, 0.5, f"No more files in {self.input_dir}\n Wait for the queued files to be processed", ha="center", va="center", transform=self.ax.transAxes)
             self.ax.set_axis_off()
             self.canvas.draw_idle()
-
-        self.index += 1
-        self.frame_inx = 0
-        self.show_frame(self.index)
