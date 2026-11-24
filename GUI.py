@@ -700,7 +700,7 @@ class App(ttk.Window):
 
         self.contrast_input_dir.set(folder)
         self._populate_file_list(self.contrast_file_list, folder)
-        self._load_contrast_folder()
+        self.load_external_python_scripts(self.contrast_input_dir, self.contrast_output_dir, self.contrast_tool)
 
     def choose_crop_folder(self):
         folder = filedialog.askdirectory(title="Select Crop input folder")
@@ -709,7 +709,7 @@ class App(ttk.Window):
 
         self.crop_input_dir.set(folder)
         self._populate_file_list(self.crop_file_list, folder)
-        self._load_crop_folder()    
+        self.load_external_python_scripts(self.crop_input_dir, self.crop_output_dir, self.crop_tool) 
 
     def choose_mask_folder(self):
 
@@ -720,7 +720,7 @@ class App(ttk.Window):
 
         self.mask_input_dir.set(folder)
         self._populate_file_list(self.mask_file_list, folder)
-        self._load_mask_folder()
+        self.load_external_python_scripts(self.mask_input_dir, self.mask_output_dir, self.mask_tool) 
 
     ''' OUTPUT DIRECTORY '''
 
@@ -741,7 +741,7 @@ class App(ttk.Window):
             return
 
         self.mask_output_dir.set(folder)
-        self._load_mask_folder()
+        self.load_external_python_scripts(self.mask_input_dir, self.mask_output_dir, self.mask_tool) 
 
     def choose_contrast_output_folder(self):
 
@@ -753,7 +753,7 @@ class App(ttk.Window):
             return
 
         self.contrast_output_dir.set(folder)
-        self.load_external_python_scripts(self.mask_input_dir, self.mask_output_dir, self.mask_tool)
+        self.load_external_python_scripts(self.contrast_input_dir, self.contrast_output_dir, self.contrast_tool)
 
     def choose_crop_output_folder(self):
     
@@ -765,7 +765,7 @@ class App(ttk.Window):
             return
 
         self.crop_output_dir.set(folder)
-        self._load_crop_folder()
+        self.load_external_python_scripts(self.crop_input_dir, self.crop_output_dir, self.crop_tool) 
 
     def ensure_output_directory(self, directory):
         """Create the output directory if it doesn't exist."""
@@ -775,10 +775,44 @@ class App(ttk.Window):
 
     ''' RUN SCRIPTS '''
 
+    def _is_script_valid_to_run(self, input_dir, output_dir):
+
+        # Check if input as been set // and if it a is a dir
+        if not input_dir or not Path(input_dir).is_dir():
+            messagebox.showerror(
+                "Missing input",
+                "Choose a valid input folder.",
+                parent=self,
+            )
+            return 1
+
+        # Check for output directory 
+        if not output_dir:
+            messagebox.showerror(
+                "Missing output",
+                "Choose an output directory.",
+                parent=self,
+            )
+            return 1
+
+        # Check for FFMPEG
+        if self.storage["path_ffmpeg"] == "":
+            messagebox.showerror(
+                "Missing FFMPEG",
+                "Select FFMPEG exe file.",
+                parent=self,
+            )
+            return 1
+
+        return 0
+
     def run_letter_box(self):
         page = self.file_pages["Letter Box"]
         input_dir = page["input_dir"].get().strip()
         output_dir = self.letter_output_dir.get().strip()
+
+        if self._is_script_valid_to_run(input_dir, output_dir) == 1:
+            return
 
         width = self.letterbox_width.get().strip()
         height = self.letterbox_height.get().strip()
@@ -794,28 +828,15 @@ class App(ttk.Window):
             )
             return
 
-        if not input_dir or not Path(input_dir).is_dir():
-            messagebox.showerror(
-                "Missing input",
-                "Choose a valid input folder.",
-                parent=self,
-            )
-            return
-
-        if not output_dir:
-            messagebox.showerror(
-                "Missing output",
-                "Choose an output directory.",
-                parent=self,
-            )
-            return
-
         self.start_script(LETTER_BOX_SCRIPT, [self.storage["path_ffmpeg"], input_dir, output_dir, width, height], self.letter_box_status)
 
     def run_cap_fps(self):
         ffmpeg_exe = self.storage["path_ffmpeg"]
         input_dir = self.cap_input_dir.get().strip()
         output_dir = self.cap_output_dir.get().strip()
+
+        if self._is_script_valid_to_run(input_dir, output_dir) == 1:
+            return
 
         try:
             frames = int(self.target_frames.get().strip())
@@ -829,64 +850,7 @@ class App(ttk.Window):
             )
             return
 
-        if not input_dir or not Path(input_dir).is_dir():
-            messagebox.showerror(
-                "Missing input",
-                "Choose a valid input folder.",
-                parent=self,
-            )
-            return
-
-        if not output_dir:
-            messagebox.showerror(
-                "Missing output",
-                "Choose an output directory.",
-                parent=self,
-            )
-            return
-
-        try:
-            output_dir = self.ensure_output_directory(output_dir)
-        except OSError as error:
-            messagebox.showerror(
-                "Output directory error", str(error), parent=self
-            )
-            return
-
         self.start_script(CAP_FPS_SCRIPT, [ffmpeg_exe, input_dir, str(frames), output_dir], self.cap_status)
-
-    def run_folder_script(self, page_name):
-        page = self.file_pages[page_name]
-        input_dir = page["input_dir"].get().strip()
-        output_dir = page["output_dir"].get().strip()
-
-        if not input_dir or not Path(input_dir).is_dir():
-            messagebox.showerror(
-                "Missing input",
-                "Choose a valid input folder.",
-                parent=self,
-            )
-            return
-
-        if not output_dir:
-            messagebox.showerror(
-                "Missing output",
-                "Choose an output directory.",
-                parent=self,
-            )
-            return
-
-        try:
-            output_dir = self.ensure_output_directory(output_dir)
-        except OSError as error:
-            messagebox.showerror(
-                "Output directory error", str(error), parent=self
-            )
-            return
-
-        self.start_script(page["script"], [input_dir, output_dir, self.storage["path_ffmpeg"]], page["status"])
-
-    ### Spaghetti // these are the same script - make them one single method (same for page build + input/output choice)
 
     def load_external_python_scripts(self, input, output, tool):
         input_dir = input.get().strip()
@@ -896,45 +860,6 @@ class App(ttk.Window):
             return
 
         tool.load_folder(
-            input_dir,
-            output_dir,
-            self.storage["path_ffmpeg"],
-        )
-
-    def _load_contrast_folder(self):
-        input_dir = self.contrast_input_dir.get().strip()
-        output_dir = self.contrast_output_dir.get().strip()
-
-        if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
-            return
-
-        self.contrast_tool.load_folder(
-            input_dir,
-            output_dir,
-            self.storage["path_ffmpeg"],
-        )
-
-    def _load_crop_folder(self):
-            input_dir = self.crop_input_dir.get().strip()
-            output_dir = self.crop_output_dir.get().strip()
-    
-            if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
-                return
-    
-            self.crop_tool.load_folder(
-                input_dir,
-                output_dir,
-                self.storage["path_ffmpeg"],
-            )
-
-    def _load_mask_folder(self):
-        input_dir = self.mask_input_dir.get().strip()
-        output_dir = self.mask_output_dir.get().strip()
-
-        if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
-            return
-
-        self.mask_tool.load_folder(
             input_dir,
             output_dir,
             self.storage["path_ffmpeg"],
