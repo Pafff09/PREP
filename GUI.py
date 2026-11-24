@@ -175,7 +175,6 @@ class App(ttk.Window):
         ttk.Label(page, text=f"Detected user's virtualenv || {sys.prefix}"
                 ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-
     def _build_cap_fps_page(self):
 
         # Add page main frame
@@ -273,15 +272,17 @@ class App(ttk.Window):
                   ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
         ### Width & Height ###
-        ttk.Label(page, text="Letterbox Width:"
-                  ).grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(page, textvariable=self.letterbox_width, width=12
-                  ).grid(row=4, column=1, sticky="w", pady=6)
+        parameters_frame = ttk.Frame(page)
+        parameters_frame.grid(row=4, column=0, columnspan=2, sticky="w", padx=(0, 10), pady=6)
+        ttk.Label(parameters_frame, text="Width:"
+                  ).grid(row=0, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Entry(parameters_frame, textvariable=self.letterbox_width, width=12
+                  ).grid(row=0, column=1, sticky="w", pady=6)
 
-        ttk.Label(page, text="Letterbox Height:"
-                  ).grid(row=5, column=0, sticky="w", padx=(0, 10), pady=6)
-        ttk.Entry(page, textvariable=self.letterbox_height, width=12
-                  ).grid(row=5, column=1, sticky="w", pady=6)
+        ttk.Label(parameters_frame, text="Height:"
+                  ).grid(row=0, column=3, sticky="w", padx=(10, 10), pady=6)
+        ttk.Entry(parameters_frame, textvariable=self.letterbox_height, width=12
+                  ).grid(row=0, column=4, sticky="w", pady=6)
 
         self.letter_box_status = ttk.Label(page, text="Ready")
         self.letter_box_status.grid(row=6, column=1, sticky="w", padx=10)
