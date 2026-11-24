@@ -1,6 +1,4 @@
-import os
-import subprocess
-import sys
+import os, subprocess, sys, queue, threading
 from pathlib import Path
 
 import cv2
@@ -9,9 +7,17 @@ from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
 
 class AddMask:
-    def __init__(self, parent):
+    def __init__(self, parent, terminal):
 
         self.parent = parent
+        self.terminal = terminal
+
+        # Queueing jobs 
+        self.output_queue = queue.Queue()
+        self.pending_jobs = []
+        self.mask_running = False
+        self.output_polling = False
+
         self.input_dir = ""
         self.output_dir = ""
         self.ffmpeg_exe = ""
@@ -82,7 +88,7 @@ class AddMask:
             self.canvas.draw_idle()
             return
 
-        self.show_frame(self.index)
+        return self.show_frame(self.index)
 
     def show_frame(self, index):
         self.index = index
@@ -117,17 +123,6 @@ class AddMask:
         self.ax.set_axis_off()
         self.canvas.draw_idle()
 
-    def on_select(self, start, end):
-        if start.xdata is None or start.ydata is None:
-            return
-        if end.xdata is None or end.ydata is None:
-            return
-
-        self.x = int(min(start.xdata, end.xdata))
-        self.y = int(min(start.ydata, end.ydata))
-        self.width = int(abs(end.xdata - start.xdata))
-        self.height = int(abs(end.ydata - start.ydata))
-
     def mask_current_video(self):
 
         if self.width <= 0 or self.height <= 0:
@@ -152,17 +147,101 @@ class AddMask:
             command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", 
                        "-File", self.mask_script, *parameters,]
 
-        result = subprocess.run(command, check=False, capture_output=True, text=True)
+        # Append the new command and either start it, or queue it
+        self.pending_jobs.append((filename, command))
+        self._start_next_mask_job()
+        self._schedule_output_poll()
 
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or "Mask script failed.")
+    ''' Queueing jobs methods '''
 
-    '''
-    ON KEY PRESS
-        left-arrow  : move to previous frame
-        right-arrow : move to next frame
-        enter       : run mask script
-    '''
+    def _start_next_mask_job(self):
+        if self.mask_running or not self.pending_jobs:
+            return
+
+        filename, command = self.pending_jobs.pop(0)
+        self.mask_running = True
+
+        self.terminal.configure(state="normal")
+        self.terminal.insert("end", f"\nStarting: {filename}\n")
+        self.terminal.see("end")
+        self.terminal.configure(state="disabled")
+
+        threading.Thread(
+            target=self._run_mask_command,
+            args=(command,),
+            daemon=True,
+        ).start()
+
+    def _schedule_output_poll(self):
+        if not self.output_polling:
+            self.output_polling = True
+            self.parent.after(100, self._drain_output_queue)
+
+    def _drain_output_queue(self):
+        try:
+            while True:
+                event, value = self.output_queue.get_nowait()
+
+                if event == "output":
+                    self.terminal.configure(state="normal")
+                    self.terminal.insert("end", value)
+                    self.terminal.see("end")
+                    self.terminal.configure(state="disabled")
+
+                elif event == "done":
+                    status = "completed" if value == 0 else f"failed (exit code: {value})"
+
+                    self.terminal.configure(state="normal")
+                    self.terminal.insert("end", f"\nJob {status}.\n")
+                    self.terminal.see("end")
+                    self.terminal.configure(state="disabled")
+
+                    self.mask_running = False
+                    self._start_next_mask_job()
+
+        except queue.Empty:
+            pass
+
+        if self.mask_running or self.pending_jobs:
+            self.parent.after(100, self._drain_output_queue)
+        else:
+            self.output_polling = False
+
+    ''' Running jobs methods '''
+
+    def _run_mask_command(self, command):
+        try:
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+
+            for line in process.stdout:
+                self.output_queue.put(("output", line))
+
+            return_code = process.wait()
+            self.output_queue.put(("done", return_code))
+
+        except Exception as error:
+            self.output_queue.put(("output", f"Error: {error}\n"))
+        self.output_queue.put(("done", None))
+
+    ''' Handle events in the PLT methods '''
+
+    def on_select(self, start, end):
+        if start.xdata is None or start.ydata is None:
+            return
+        if end.xdata is None or end.ydata is None:
+            return
+
+        self.x = int(min(start.xdata, end.xdata))
+        self.y = int(min(start.ydata, end.ydata))
+        self.width = int(abs(end.xdata - start.xdata))
+        self.height = int(abs(end.ydata - start.ydata))
+
     def on_key_press(self, event):
 
         if event.key == "right":

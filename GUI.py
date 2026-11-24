@@ -2,11 +2,14 @@
 import subprocess, threading, queue, json, sys, os
 from pathlib import Path
 
+# External libraries
+from tkinter.scrolledtext import ScrolledText
 from tkinter import filedialog, messagebox
 import ttkbootstrap as ttk
 import tkinter as tk
 import cv2
 
+# Python scripts
 from src.py.crop import ContourCropper
 from src.py.contrast import Contrast
 from src.py.mask import AddMask
@@ -114,6 +117,10 @@ class App(ttk.Window):
         self.page_area.grid_columnconfigure(0, weight=1)
         self.page_area.grid_rowconfigure(0, weight=1)
 
+        # Build the terminal
+        self.terminal_frame, self.terminal = self._new_terminal(self.page_area)
+        self.terminal_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=(12, 16))
+
         self._build_home_page()
         self._build_cap_fps_page()
         self._build_contrast_page()
@@ -202,22 +209,22 @@ class App(ttk.Window):
 
         # Output directory
         ttk.Label(page, text="Output directory:"
-                  ).grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
+                  ).grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Entry(page, textvariable=self.cap_output_dir
-                  ).grid(row=3, column=1, sticky="ew", pady=6)
+                  ).grid(row=4, column=1, sticky="ew", pady=6)
         ttk.Button(page, icon="folder", bootstyle="secondary",
                    command=lambda: self.choose_output_directory(self.cap_output_dir)
-                  ).grid(row=3, column=2, padx=(8, 0), pady=6)
+                  ).grid(row=4, column=2, padx=(8, 0), pady=6)
 
         # Desired FPS 
         ttk.Label(page, text="Desired frame count:"
-                  ).grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
+                  ).grid(row=5, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Entry(page, textvariable=self.target_frames, width=12
-                  ).grid(row=4, column=1, sticky="w", pady=6)
+                  ).grid(row=5, column=1, sticky="w", pady=6)
 
         # Script status
         self.cap_status = ttk.Label(page, text="Ready")
-        self.cap_status.grid(row=5, column=1, sticky="w", padx=10)
+        self.cap_status.grid(row=6, column=1, sticky="w", padx=10)
 
         # Run button
         run_button = ttk.Button(
@@ -226,7 +233,7 @@ class App(ttk.Window):
             bootstyle="success",
             command=self.run_cap_fps,
         )
-        run_button.grid(row=5, column=0, sticky="w", pady=(16, 0))
+        run_button.grid(row=6, column=0, sticky="w", pady=(16, 0))
         self.run_buttons.append(run_button)
 
     def _build_letter_box_page(self):
@@ -285,7 +292,7 @@ class App(ttk.Window):
                   ).grid(row=0, column=4, sticky="w", pady=6)
 
         self.letter_box_status = ttk.Label(page, text="Ready")
-        self.letter_box_status.grid(row=6, column=1, sticky="w", padx=10)
+        self.letter_box_status.grid(row=5, column=1, sticky="w", padx=10)
 
         run_button = ttk.Button(
             page,
@@ -293,7 +300,7 @@ class App(ttk.Window):
             bootstyle="success",
             command=self.run_letter_box,
         )
-        run_button.grid(row=6, column=0, sticky="w", pady=(16, 0))
+        run_button.grid(row=5, column=0, sticky="w", pady=(16, 0))
         self.run_buttons.append(run_button)
 
         # This is a dumb way to solve the problem; Solve later
@@ -477,7 +484,7 @@ class App(ttk.Window):
                     command=self.choose_mask_output_folder,
                    ).grid(row=3, column=2, padx=(8, 0), pady=6)
 
-        self.mask_tool = AddMask(self.mask_plot_frame)
+        self.mask_tool = AddMask(self.mask_plot_frame, self.terminal)
 
     def show_page(self, page_name):
         self.pages[page_name].tkraise()
@@ -486,36 +493,56 @@ class App(ttk.Window):
             style = "primary" if name == page_name else "secondary outline"
             button.configure(bootstyle=style)
 
-    ''' TREEVIEWER METHODS '''
+    ''' TREEVIEWER/TERMINAL METHODS '''
+
+    def _new_terminal(self, parent):
+        frame = ttk.Frame(parent)
+
+        terminal = tk.Text(
+            frame, height=10, wrap="word",
+            bg="#0c0c0c", fg="#d4d4d4", insertbackground="#d4d4d4", selectbackground="#264f78", selectforeground="#ffffff",
+            font=("Consolas", 5), relief="flat", borderwidth=0, padx=10, pady=8, state="normal")
+
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=terminal.yview)
+        terminal.insert("end", f"{os.getcwd()} >")
+        terminal.configure(yscrollcommand=scrollbar.set, state="disable")
+
+        terminal.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+
+        return frame, terminal
 
     def _new_file_list(self, parent):
 
-            # Create a frame
-            frame = ttk.Frame(parent)
-            frame.grid_columnconfigure(0, weight=1)
-            frame.grid_rowconfigure(0, weight=1)
+        # Create a frame
+        frame = ttk.Frame(parent)
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(0, weight=1)
 
-            # Tree viewer to visualise selected files
-            tree = ttk.Treeview(
-                frame,
-                columns=("filename",),
-                show="headings",
-                height=10,
-            )
-            tree.heading("filename", text="Add a folder")
-            tree.column("filename", anchor="w")
-            tree.grid(row=0, column=0, sticky="nsew")
+        # Tree viewer to visualise selected files
+        tree = ttk.Treeview(
+            frame,
+            columns=("filename",),
+            show="headings",
+            height=10,
+        )
+        tree.heading("filename", text="Add a folder")
+        tree.column("filename", anchor="w")
+        tree.grid(row=0, column=0, sticky="nsew")
 
-            # Add scrollbar
-            scrollbar = ttk.Scrollbar(
-                frame,
-                orient="vertical",
-                command=tree.yview,
-            )
-            scrollbar.grid(row=0, column=1, sticky="ns")
-            tree.configure(yscrollcommand=scrollbar.set)
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(
+            frame,
+            orient="vertical",
+            command=tree.yview,
+        )
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        tree.configure(yscrollcommand=scrollbar.set)
 
-            return frame, tree
+        return frame, tree
 
     def _populate_file_list(self, tree, folder, which=None):
         
@@ -860,11 +887,13 @@ class App(ttk.Window):
         if not input_dir or not Path(input_dir).is_dir() or not output_dir or self.storage["path_ffmpeg"] == "":
             return
 
-        tool.load_folder(
+        command = tool.load_folder(
             input_dir,
             output_dir,
             self.storage["path_ffmpeg"],
         )
+
+        print(command)
 
     ''' General run scripts '''
 
@@ -889,6 +918,10 @@ class App(ttk.Window):
         for button in self.run_buttons:
             button.configure(state="disabled")
 
+        self.terminal.configure(state="normal")
+        self.terminal.delete("1.0", "end")
+        self.terminal.configure(state="disabled")
+
         # Thread to background process
         threading.Thread(
             target=self._run_command,
@@ -901,47 +934,54 @@ class App(ttk.Window):
 
     def _run_command(self, command):
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 command,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                check=False)
+                bufsize=1,
+            )
+            self.command_process = process
 
-            self.result_queue.put((result.returncode, result.stdout, result.stderr))
+            for line in process.stdout:
+                self.result_queue.put(("output", line))
+
+            return_code = process.wait()
+            self.result_queue.put(("done", return_code))
 
         except Exception as error:
-            self.result_queue.put((None, "", str(error)))
+            self.result_queue.put(("output", f"Error: {error}\n"))
+            self.result_queue.put(("done", None))
 
     def check_script_result(self):
-        
         try:
-            # If code has returned something: finished or error -> Run the rest of the code
-            return_code, stdout, stderr = self.result_queue.get_nowait()
+            while True:
+                event = self.result_queue.get_nowait()
+
+                if event[0] == "output":
+                    self.terminal.configure(state="normal")
+                    self.terminal.insert("end", event[1])
+                    self.terminal.see("end")
+                    self.terminal.configure(state="disabled")
+
+                elif event[0] == "done":
+                    return_code = event[1]
+                    self.script_running = False
+
+                    for button in self.run_buttons:
+                        button.configure(state="normal")
+
+                    if return_code == 0:
+                        self.active_status.configure(text="Completed", bootstyle="success")
+                    else:
+                        self.active_status.configure(text="Failed", bootstyle="danger")
+
+                    return
 
         except queue.Empty:
-            # If code is still running, continue
-            self.after(100, self.check_script_result)
-            return
+            pass
 
-        self.script_running = False
-
-        for button in self.run_buttons:
-            button.configure(state="normal")
-
-        if return_code == 0:
-            self.active_status.configure(text="Completed", bootstyle="success")
-            messagebox.showinfo(
-                "Script complete",
-                stdout.strip() or "The script completed successfully.",
-                parent=self,
-            )
-        else:
-            self.active_status.configure(text="Failed", bootstyle="danger")
-            messagebox.showerror(
-                "Script failed",
-                stderr.strip() or stdout.strip() or "The script failed.",
-                parent=self,
-            )
+        self.after(100, self.check_script_result)
 
 if __name__ == "__main__":
     app = App()
