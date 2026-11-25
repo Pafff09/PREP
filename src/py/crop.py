@@ -1,13 +1,12 @@
-import os
-import sys
-import subprocess
+import os, sys
 from pathlib import Path
 
 import cv2
 import numpy as np
+import tkinter as tk
+import ttkbootstrap as ttk
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.widgets import Slider, TextBox
 from matplotlib.patches import Rectangle
 
 from src.py.queue_commands import QueueJobs
@@ -26,6 +25,7 @@ class ContourCropper:
         self.ffmpeg_exe = ""
         self.crop_script = ""
         self.files = []
+        self.contour_labels = {}
 
         self.user_operating_system = sys.platform
 
@@ -33,7 +33,7 @@ class ContourCropper:
         self.NON_SELECTED_COLOR = (0, 255, 255)
         self.SELECTED_COLOR = (0, 255, 0)
         self.LINE_WIDTH = 3
-        self.BUFFER_AREA = 25
+        self.BUFFER_AREA = 25 
 
         # Manual-box state
         self.manual_boxes = {}
@@ -66,16 +66,23 @@ class ContourCropper:
         self.contour_textboxes = {}
         self.textbox_axes = {}
 
-        # Embedded Matplotlib figure
+        # Sliders
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+
+        self.controls_frame = ttk.Frame(parent, padding=(64, 16))
+        self.controls_frame.grid(row=0, column=1, sticky="ns")
+
+
         self.fig = Figure(figsize=(8, 5))
         self.ax = self.fig.add_subplot(111)
-        self.fig.subplots_adjust(left=0.28, right=0.72, top=0.95, bottom=0.05)
+        self.fig.subplots_adjust(left=0.02, right=0.98, top=0.95, bottom=0.05)
         self.ax.set_axis_off()
         self.ax.text(0.5, 0.5, "Load both input and output",
                     ha="center", va="center", transform=self.ax.transAxes)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew")
 
         self.canvas.mpl_connect("button_press_event", self.on_mouse_click)
         self.canvas.mpl_connect("button_press_event", self.on_manual_box_press)
@@ -83,31 +90,47 @@ class ContourCropper:
         self.canvas.mpl_connect("button_release_event", self.on_manual_box_release)
         self.canvas.mpl_connect("key_press_event", self.on_key_press)
 
-        # Sliders
-        c1_ax = self.fig.add_axes([0.17, 0.25, 0.0225, 0.5])
-        c2_ax = self.fig.add_axes([0.14, 0.25, 0.0225, 0.5])
+        self.slider_frame = ttk.Frame(self.controls_frame, padding=(8, 8, 8, 12))
 
-        self.c1_slider = Slider(
-            c1_ax,
-            "Canny thresh 1",
-            0,
-            255,
-            valinit=self.CANNY_THRESHOLD_1,
-            orientation="vertical",
-        )
-        self.c2_slider = Slider(
-            c2_ax,
-            "Canny thresh 2",
-            0,
-            255,
-            valinit=self.CANNY_THRESHOLD_2,
-            orientation="vertical",
-        )
+        ttk.Label(self.slider_frame, text="Canny 1").grid(row=0, column=0, sticky="w")
+        self.c1_var = tk.IntVar(value=self.CANNY_THRESHOLD_1)
+        self.c1_slider = ttk.Scale(self.slider_frame,
+                                    from_=0, to=255, orient="vertical", length=280, command=self.update_sliders)
+        self.c1_slider.set(self.CANNY_THRESHOLD_1)
+        self.c1_slider.grid(row=1, column=0, sticky="ew", pady=(0, 8))
 
-        self.c1_slider.label.set_rotation(90)
-        self.c2_slider.label.set_rotation(90)
-        self.c1_slider.on_changed(self.update_sliders)
-        self.c2_slider.on_changed(self.update_sliders)
+        ttk.Label(self.slider_frame, text="Canny 2").grid(row=0, column=1, sticky="w")
+        self.c2_var = tk.IntVar(value=self.CANNY_THRESHOLD_2)
+        self.c2_slider = ttk.Scale(self.slider_frame,
+                                   from_=0, to=255, orient="vertical", length=280, command=self.update_sliders)
+        self.c2_slider.set(self.CANNY_THRESHOLD_2)
+        self.c2_slider.grid(row=1, column=1, sticky="ew", pady=(0, 12))
+
+        # Separator line
+        ttk.Separator(self.slider_frame).grid(row=2, column=0, columnspan=2, sticky="ew", pady=6)
+
+        # Textboxes Frame
+        self.textboxes_frame = ttk.Frame(self.controls_frame)
+
+        # Buffer Frame
+        self.buffer_frame = ttk.Frame(self.controls_frame, padding=(8, 8, 8, 12))
+
+        ttk.Label(self.buffer_frame, text="Crop buffer (pixels)").grid(row=0, column=0, sticky="w")
+
+        self.buffer_value_label = ttk.Label(self.buffer_frame, text=str(self.BUFFER_AREA), width=3, anchor="e")
+        self.buffer_value_label.grid(row=0, column=1, sticky="e")
+
+        self.buffer_slider = ttk.Scale(self.buffer_frame,
+                                       from_=0, to=100, orient="horizontal", command=self.update_buffer,)
+        self.buffer_slider.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.buffer_slider.set(self.BUFFER_AREA)
+        self.buffer_frame.columnconfigure(0, weight=1)
+
+        ### PACK/config CONTROL FRAMES ###
+        self.slider_frame.grid(row=0, column=0, sticky="ew")
+        self.buffer_frame.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        self.textboxes_frame.grid(row=2, column=0, sticky="new", pady=(12, 0))
+        self.controls_frame.columnconfigure(0, weight=1)
 
     def load_folder(self, input_dir, output_dir, ffmpeg_exe):
         self.input_dir = input_dir
@@ -162,19 +185,7 @@ class ContourCropper:
         self.selected.add(manual_id)
         self.contour_inputs[manual_id] = ""
 
-        textbox_ax = self.fig.add_axes([0.75, 0.85, 0.23, 0.05])
-        textbox = TextBox(
-            textbox_ax,
-            f"{self.manual_label} {-manual_id}",
-            initial="",
-        )
-        textbox.on_text_change(
-            lambda text, item_id=manual_id: self.save_contour_text(item_id, text)
-        )
-
-        self.textbox_axes[manual_id] = textbox_ax
-        self.contour_textboxes[manual_id] = textbox
-        self.layout_textboxes()
+        self.add_name_entry(manual_id, f"{self.manual_label} {-manual_id}")
         self.redraw()
 
     def on_manual_box_press(self, event):
@@ -223,7 +234,7 @@ class ContourCropper:
         else:
             self.redraw()
 
-### Contours ###
+    ### Contours ###
 
     def find_contours(self):
         edges = cv2.Canny(
@@ -239,62 +250,60 @@ class ContourCropper:
         )
         return contours
 
-    def add_contour_textbox(self, contour_index):
-        if contour_index in self.contour_textboxes:
+    def add_name_entry(self, item_id, label):
+        if item_id in self.contour_textboxes:
             return
 
-        self.contour_inputs[contour_index] = ""
-        textbox_ax = self.fig.add_axes([0.75, 0.85, 0.23, 0.05])
-        textbox = TextBox(
-            textbox_ax,
-            f"{self.contour_label} {contour_index}",
-            initial="",
+        row = len(self.contour_textboxes)
+        ttk.Label(self.textboxes_frame, text=label).grid(
+            row=row, column=0, sticky="w", padx=(0, 6), pady=2
         )
-        textbox.on_text_change(
-            lambda text, item_id=contour_index: self.save_contour_text(item_id, text)
+        entry = ttk.Entry(self.textboxes_frame, width=18)
+        entry.grid(row=row, column=1, sticky="ew", pady=2)
+        entry.bind(
+            "<KeyRelease>",
+            lambda event, key=item_id: self.save_contour_text(key, event.widget.get()),
         )
 
-        self.textbox_axes[contour_index] = textbox_ax
-        self.contour_textboxes[contour_index] = textbox
-        self.layout_textboxes()
+        self.contour_textboxes[item_id] = entry
+        self.textboxes_frame.columnconfigure(1, weight=1)
+
+    def add_contour_textbox(self, contour_index):
+        self.contour_inputs[contour_index] = ""
+        self.add_name_entry(contour_index, f"{self.contour_label} {contour_index}")
 
     def save_contour_text(self, contour_index, text):
         self.contour_inputs[contour_index] = text
 
     def remove_contour_textbox(self, contour_index):
-        self.contour_textboxes.pop(contour_index, None)
-        textbox_ax = self.textbox_axes.pop(contour_index, None)
+        entry = self.contour_textboxes.pop(contour_index, None)
+        if entry is not None:
+            entry.destroy()
 
-        if textbox_ax is not None:
-            textbox_ax.remove()
+        label = self.contour_labels.pop(contour_index, None)
+        if label is not None:
+            label.destroy()
 
         self.contour_inputs.pop(contour_index, None)
         self.layout_textboxes()
 
     def layout_textboxes(self):
-        count = len(self.textbox_axes)
-        row_spacing = 0.55
-        textbox_height = 0.32
-        figure_height = max(6.0, 1.0 + count * row_spacing)
+        for row, item_id in enumerate(self.contour_textboxes):
+            self.contour_labels[item_id].grid(row=row, column=0, sticky="w",
+                                            padx=(0, 6), pady=2)
+            self.contour_textboxes[item_id].grid(row=row, column=1, sticky="ew",
+                                                pady=2)
 
-        self.fig.set_size_inches(12, figure_height, forward=True)
+    ### Buffer ###
+    def update_buffer(self, value):
 
-        slider_bottom = (figure_height - 3.0) / (2.0 * figure_height)
-        for slider in (self.c1_slider, self.c2_slider):
-            pos = slider.ax.get_position()
-            slider.ax.set_position(
-                [pos.x0, slider_bottom, pos.width, 3.0 / figure_height]
-            )
+        self.BUFFER_AREA = int(float(value))
+        self.buffer_value_label.configure(text=str(self.BUFFER_AREA))
 
-        for row, item_id in enumerate(sorted(self.textbox_axes)):
-            y = 1.0 - (0.45 + (row + 1) * row_spacing) / figure_height
-            self.textbox_axes[item_id].set_position(
-                [0.75, y, 0.23, textbox_height / figure_height]
-            )
+        if self.frame is not None:
+            self.redraw()
 
-        self.canvas.draw_idle()
-
-### General ###
+    ### General ###
 
     def show_frame(self, index):
         self.index = index
@@ -447,16 +456,25 @@ class ContourCropper:
         self.ax.set_axis_off()
         self.canvas.draw_idle()
 
-    def nearest_contour(self, x, y):
-        if not self.contours:
+    def nearest_contour(self, x, y, candidates=None):
+        if candidates is None:
+            candidates = range(len(self.contours))
+
+        candidates = [
+            contour_id for contour_id in candidates
+            if 0 <= contour_id < len(self.contours)
+        ]
+        if not candidates:
             return None
 
         point = np.array([x, y])
-        distances = [
-            np.min(np.sum((contour[:, 0, :] - point) ** 2, axis=1))
-            for contour in self.contours
-        ]
-        return int(np.argmin(distances))
+        distances = {
+            contour_id: np.min(
+                np.sum((self.contours[contour_id][:, 0, :] - point) ** 2, axis=1)
+            )
+            for contour_id in candidates
+        }
+        return min(distances, key=distances.get)
 
     def on_mouse_click(self, event):
         if self.drawing_manual_box:
@@ -479,7 +497,16 @@ class ContourCropper:
                 self.redraw()
                 return
 
-        contour_id = self.nearest_contour(px, py)
+        if event.button == 3:
+            candidates = (
+                item_id for item_id in self.selected
+                if item_id not in self.manual_boxes
+            )
+        else:
+            candidates = range(len(self.contours))
+
+        contour_id = self.nearest_contour(px, py, candidates)
+        
         if contour_id is None:
             return
 
@@ -492,9 +519,10 @@ class ContourCropper:
 
         self.redraw()
 
-    def update_sliders(self, _):
-        self.CANNY_THRESHOLD_1 = int(self.c1_slider.val)
-        self.CANNY_THRESHOLD_2 = int(self.c2_slider.val)
+    def update_sliders(self, _value=None):
+
+        self.CANNY_THRESHOLD_1 = int(float(self.c1_slider.get()))
+        self.CANNY_THRESHOLD_2 = int(float(self.c2_slider.get()))
 
         if self.blurred_frame is None:
             return
@@ -506,8 +534,8 @@ class ContourCropper:
                 self.remove_contour_textbox(item_id)
 
         self.selected = {
-            box_id for box_id in self.selected
-            if box_id in self.manual_boxes
+            item_id for item_id in self.selected
+            if item_id in self.manual_boxes
         }
 
         self.redraw()
