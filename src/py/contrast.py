@@ -1,26 +1,28 @@
-import ntpath
-import os
-import subprocess
-import sys
+# Default python modules
+import ntpath, os, sys
 from pathlib import Path
 
+# External dependencies not installed by default
 import cv2
 import numpy as np
 import ttkbootstrap as ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+# Internal scripts
 from src.py.queue_commands import QueueJobs
 
 class Contrast:
     def __init__(self, parent, terminal):
-        
+
+        # GUI parameters
         self.parent = parent
         self.terminal = terminal
 
         # Queueing jobs 
         self.contrast_queue = QueueJobs(self.parent, terminal)
 
+        # 
         self.input_dir = ""
         self.output_dir = ""
         self.ffmpeg_exe = ""
@@ -31,6 +33,7 @@ class Contrast:
         self.frame_inx = 0
         self.image_artist = None
 
+        # Get users OS and adapt shell scripts accordingly
         self.user_operating_system = sys.platform
         if self.user_operating_system in ("linux", "linux2", "darwin"):
             self.contrast_script = os.path.join("src", "sh", "contrast.sh")
@@ -41,48 +44,13 @@ class Contrast:
                 f"Unsupported operating system: {self.user_operating_system}"
             )
 
-        self.brightness_var = ttk.DoubleVar(value=0)
-        self.contrast_var = ttk.DoubleVar(value=0)
+        # Sliders
+        self._build_sliders(parent)
 
-        controls = ttk.Frame(parent, padding=(8, 0))
-        controls.pack(side="right", fill="y")
+        # Canva
+        self._build_canvas(parent)  
 
-        ttk.Label(controls, text="Brightness").pack(pady=(8, 0))
-        self.brightness_scale = ttk.Scale(
-            controls,
-            from_=0,
-            to=255,
-            orient="vertical",
-            variable=self.brightness_var,
-            command=self.update_sliders,
-            length=220,
-        )
-        self.brightness_scale.pack(fill="y", expand=True, padx=12)
-
-        ttk.Label(controls, text="Contrast").pack(pady=(8, 0))
-        self.contrast_scale = ttk.Scale(
-            controls,
-            from_=0,
-            to=255,
-            orient="vertical",
-            variable=self.contrast_var,
-            command=self.update_sliders,
-            length=220,
-        )
-        self.contrast_scale.pack(fill="y", expand=True, padx=12)
-
-        self.fig = Figure(figsize=(8, 5))
-        self.ax = self.fig.add_subplot(111)
-        self.ax.set_axis_off()
-        self.ax.text(0.5, 0.5, "Load both input and output",
-                    ha="center", va="center", transform=self.ax.transAxes)
-
-        self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
-        self.canvas.get_tk_widget().pack(side="left", fill="both", expand=True)
-        self.canvas.mpl_connect("key_press_event", self.on_key_press)
-
-        self.BRIGHTNESS = 0.0
-        self.CONTRAST = 0.0
+    ### Check methods ###
 
     def load_folder(self, input_dir, output_dir, ffmpeg_exe):
         self.input_dir = input_dir
@@ -101,19 +69,74 @@ class Contrast:
 
         self.show_frame(0, redraw=False)
 
-    def show_message(self, text):
-        self.frame = None
-        self.ax.clear()
-        self.ax.text(
-            0.5,
-            0.5,
-            text,
-            ha="center",
-            va="center",
-            transform=self.ax.transAxes,
-        )
+    def _build_canvas(self, parent):
+        self.fig = Figure(figsize=(8, 5))
+        self.ax = self.fig.add_subplot(111)
         self.ax.set_axis_off()
-        self.canvas.draw_idle()
+        self.ax.text(0.5, 0.5, "Load both input and output",
+                    ha="center", va="center", transform=self.ax.transAxes)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
+        self.canvas.get_tk_widget().pack(side="left", fill="both", expand=True)
+        self.canvas.mpl_connect("key_press_event", self.on_key_press)
+
+    ### EQ methods ###
+
+    def ffmpeg_eq_filter(self):
+        gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+        current_mean = float(np.mean(gray))
+        current_std = float(np.std(gray))
+
+        ff_contrast = self.CONTRAST / current_std if current_std > 0 else 1.0
+        ff_brightness = (
+            self.BRIGHTNESS
+            - ff_contrast * current_mean
+            - 127.5 * (1.0 - ff_contrast)
+        ) / 255.0
+
+        ff_brightness = float(np.clip(ff_brightness, -1.0, 1.0))
+        ff_contrast = float(np.clip(ff_contrast, -1000.0, 1000.0))
+
+        return ff_brightness, ff_contrast
+
+    ### Sliders methods ###
+
+    def _build_sliders(self, parent):
+    
+        self.brightness_var = ttk.DoubleVar(value=0)
+        self.contrast_var = ttk.DoubleVar(value=0)
+
+        self.BRIGHTNESS = 0.0
+        self.CONTRAST = 0.0
+
+        controls = ttk.Frame(parent, padding=(8, 0))
+        controls.pack(side="right", fill="y")
+
+        ttk.Label(controls, text="Brightness").pack(pady=(8, 0))
+        self.brightness_scale = ttk.Scale(controls, from_=0, to=255,
+                                            orient="vertical", variable=self.brightness_var,
+            command=self.update_sliders,
+            length=220,
+        )
+        self.brightness_scale.pack(fill="y", expand=True, padx=12)
+
+        ttk.Label(controls, text="Contrast").pack(pady=(8, 0))
+        self.contrast_scale = ttk.Scale(
+            controls,
+            from_=0,
+            to=255,
+            orient="vertical",
+            variable=self.contrast_var,
+            command=self.update_sliders,
+            length=220,
+        )
+        self.contrast_scale.pack(fill="y", expand=True, padx=12)
+
+    def update_sliders(self, _value=None):
+        self.BRIGHTNESS = float(self.brightness_var.get())
+        self.CONTRAST = float(self.contrast_var.get())
+        self.redraw()
+
+    ### Draw on CANVAS methods ###
 
     def show_frame(self, index, redraw=True):
         self.index = index
@@ -141,22 +164,19 @@ class Contrast:
 
         self.redraw()
 
-    def ffmpeg_eq_filter(self):
-        gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-        current_mean = float(np.mean(gray))
-        current_std = float(np.std(gray))
-
-        ff_contrast = self.CONTRAST / current_std if current_std > 0 else 1.0
-        ff_brightness = (
-            self.BRIGHTNESS
-            - ff_contrast * current_mean
-            - 127.5 * (1.0 - ff_contrast)
-        ) / 255.0
-
-        ff_brightness = float(np.clip(ff_brightness, -1.0, 1.0))
-        ff_contrast = float(np.clip(ff_contrast, -1000.0, 1000.0))
-
-        return ff_brightness, ff_contrast
+    def show_message(self, text):
+        self.frame = None
+        self.ax.clear()
+        self.ax.text(
+            0.5,
+            0.5,
+            text,
+            ha="center",
+            va="center",
+            transform=self.ax.transAxes,
+        )
+        self.ax.set_axis_off()
+        self.canvas.draw_idle()    
 
     def redraw(self):
         if self.frame is None:
@@ -185,10 +205,7 @@ class Contrast:
         self.ax.set_axis_off()
         self.canvas.draw_idle()
 
-    def update_sliders(self, _value=None):
-        self.BRIGHTNESS = float(self.brightness_var.get())
-        self.CONTRAST = float(self.contrast_var.get())
-        self.redraw()
+    ### Run scripts ###
 
     def run_script(self):
         name = ntpath.basename(self.path)
@@ -215,6 +232,8 @@ class Contrast:
 
         # Append the new command and either start it, or queue it
         self.contrast_queue.add(command, label=filename)
+
+    ### Handle events in canvas methods ###
 
     def on_key_press(self, event):
 
